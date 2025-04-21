@@ -1,0 +1,37 @@
+version: "3.8"
+services:
+  admin_renovada:
+    image: luissantostsx/admin-renovada:latest
+    environment:
+      - NODE_ENV=production
+      - API_URL=https://api-renovada.jbmidia.com
+    networks:
+      - externa
+      - interna
+    deploy:
+      mode: replicated
+      replicas: 3
+      update_config:
+        parallelism: 2
+        order: stop-first
+      restart_policy:
+        condition: on-failure
+      placement:
+        constraints:
+          - node.role == manager
+
+      labels:
+        - "traefik.enable=true"
+        - "traefik.http.services.admin_renovada.loadbalancer.server.port=3000"
+        - "traefik.http.services.admin_renovada.loadbalancer.passHostHeader=true"
+        - "traefik.http.routers.admin_renovada.service=admin_renovada"
+        - "traefik.http.routers.admin_renovada.rule=Host(`admin-renovada.jbmidia.com`)"
+        - "traefik.http.routers.admin_renovada.tls.certresolver=le"
+        - "traefik.http.routers.admin_renovada.entrypoints=websecure"
+        - "traefik.http.routers.admin_renovada.tls=true"
+
+networks:
+  externa:
+    external: true
+  interna:
+    external: true
