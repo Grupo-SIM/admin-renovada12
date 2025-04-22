@@ -40,7 +40,7 @@ import {
   ChevronRight,
   Download,
 } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from 'react-toastify';
 import { jsonToExcel } from "@/services/excel";
 
 interface Transaction {
@@ -187,7 +187,6 @@ const TransactionsPage = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [withdrawalAmount, setWithdrawalAmount] = useState("");
   const [pixKey, setPixKey] = useState("");
-  const { toast } = useToast();
   const [noDiaUtilModal, setNoDiaUtilModal] = useState(false);
   const [feriadoInfo, setFeriadoInfo] = useState<{name: string} | null>(null);
   const API_URL = "https://api-dom.jbmidia.com";
@@ -282,16 +281,9 @@ const TransactionsPage = () => {
         `transacoes-${new Date().toISOString().split("T")[0]}`
       );
 
-      toast({
-        title: "Sucesso",
-        description: "Arquivo Excel exportado com sucesso!",
-      });
+      toast.success("Arquivo Excel exportado com sucesso!");
     } catch (error) {
-      toast({
-        title: "Erro",
-        description: "Não foi possível exportar o arquivo Excel.",
-        variant: "destructive",
-      });
+      toast.error("Não foi possível exportar o arquivo Excel.");
     } finally {
       setIsExporting(false);
     }
@@ -318,11 +310,7 @@ const TransactionsPage = () => {
       const data = await response.json();
       setFinancialSummary(data);
     } catch (error) {
-      toast({
-        title: "Erro",
-        description: "Não foi possível carregar o resumo financeiro.",
-        variant: "destructive",
-      });
+      toast.error("Não foi possível carregar o resumo financeiro.");
     }
   };
 
@@ -355,11 +343,7 @@ const TransactionsPage = () => {
       setTransactions(data.transactions);
       setPaginationMeta(data.meta);
     } catch (error) {
-      toast({
-        title: "Erro",
-        description: "Não foi possível carregar as transações.",
-        variant: "destructive",
-      });
+      toast.error("Não foi possível carregar as transações.");
     } finally {
       setIsLoading(false);
     }
@@ -382,11 +366,7 @@ const TransactionsPage = () => {
       setWithdrawals(data.withdrawals);
       setWithdrawalsPaginationMeta(data.meta);
     } catch (error) {
-      toast({
-        title: "Erro",
-        description: "Não foi possível carregar os saques.",
-        variant: "destructive",
-      });
+      toast.error("Não foi possível carregar os saques.");
     } finally {
       setIsLoading(false);
     }
@@ -394,19 +374,12 @@ const TransactionsPage = () => {
 
   const handleWithdrawalRequest = async () => {
     if (!withdrawalAmount || parseFloat(withdrawalAmount) <= 0) {
-      toast({
-        title: "PIX enviado com sucesso! ✅",
-        description: `Seu saque de ${formatCurrency(parseFloat(withdrawalAmount))} foi processado e está sendo transferido para sua conta.`,
-      });
+      toast.success(`PIX enviado com sucesso! ✅ Seu saque de ${formatCurrency(parseFloat(withdrawalAmount))} foi processado e está sendo transferido para sua conta.`);
       return;
     }
 
     if (!pixKey.trim()) {
-      toast({
-        title: "Erro",
-        description: "Por favor, insira uma chave PIX válida.",
-        variant: "destructive",
-      });
+      toast.error("Por favor, insira uma chave PIX válida.");
       return;
     }
 
@@ -427,10 +400,7 @@ const TransactionsPage = () => {
 
       if (!response.ok) throw new Error("Falha ao solicitar saque");
 
-      toast({
-        title: "PIX enviado com sucesso! ✅",
-        description: `Seu saque de ${formatCurrency(parseFloat(withdrawalAmount))} foi processado e está sendo transferido para sua conta.`,
-      });
+      toast.success(`PIX enviado com sucesso! ✅ Seu saque de ${formatCurrency(parseFloat(withdrawalAmount))} foi processado e está sendo transferido para sua conta.`);
 
       setIsModalOpen(false);
       setWithdrawalAmount("");
@@ -438,11 +408,7 @@ const TransactionsPage = () => {
       fetchWithdrawals(withdrawalsPaginationMeta.currentPage);
       fetchFinancialSummary();
     } catch (error) {
-      toast({
-        title: "Erro",
-        description: "Não foi possível solicitar o saque.",
-        variant: "destructive",
-      });
+      toast.error("Não foi possível solicitar o saque.");
     } finally {
       setIsWithdrawing(false);
     }

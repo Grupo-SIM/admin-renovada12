@@ -11,23 +11,22 @@ import {
 import { Button } from "@/components/ui/global";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/global";
-import { useToast } from "@/hooks/use-toast";
 import { Lock } from "lucide-react";
 import { setCookie } from "@/hooks/set-cookie";
+import { toast } from 'react-toastify';
 
 const LoginPage = () => {
   const [password, setPassword] = useState("");
   const [mail, setMail] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
-  const { toast, Toasts } = useToast();
   const API_URL = process.env.API_URL || "https://api-renovada.jbmidia.com";
+  
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
 
     try {
-      // Here you would integrate with your actual authentication API
       const response = await fetch(API_URL + "/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -37,23 +36,16 @@ const LoginPage = () => {
       if (!response.ok) {
         throw new Error("Login failed");
       }
+      
       const res = await response.json();
       await setCookie("roles", res.user.roles, 1);
       await setCookie("token", res.token, 1);
     
-      // On successful login
+      toast.success("Login realizado com sucesso!");
       router.push("/admin");
-      toast({
-        title: "sucesso",
-        description: "Login realizado com sucesso.",
-        variant: "destructive",
-      });
+      
     } catch (error) {
-      toast({
-        title: "Erro",
-        description: "Senha incorreta. Tente novamente.",
-        variant: "destructive",
-      });
+      toast.error("Senha incorreta. Tente novamente.");
     } finally {
       setIsLoading(false);
     }
@@ -78,7 +70,7 @@ const LoginPage = () => {
                 </div>
                 <Input
                   id="mail"
-                  type="mail"
+                  type="email"
                   placeholder="Digite seu email"
                   value={mail}
                   onChange={(e) => setMail(e.target.value)}
@@ -103,7 +95,6 @@ const LoginPage = () => {
                   onChange={(e) => setPassword(e.target.value)}
                   className="pl-10"
                   required
-                  autoFocus
                 />
               </div>
             </div>
