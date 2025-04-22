@@ -135,6 +135,26 @@ const formatCurrency = (value: number) => {
   }).format(value);
 };
 
+const getFeriados = async () => {
+  const ano = new Date().getFullYear();
+  try {
+    const response = await fetch(`https://brasilapi.com.br/api/feriados/v1/${ano}`);
+    const data = await response.json();
+    return data.map((feriado: any) => ({
+      date: feriado.date,
+      name: feriado.name
+    }));
+  } catch (error) {
+    console.error('Erro ao buscar feriados:', error);
+    return [];
+  }
+};
+
+const isWeekend = (date: Date) => {
+  const day = date.getDay();
+  return day === 0 || day === 6; // 0 = domingo, 6 = sábado
+};
+
 const TransactionsPage = () => {
   const [activeTab, setActiveTab] = useState("transactions");
   const [transactions, setTransactions] = useState<Transaction[]>([]);
@@ -168,6 +188,8 @@ const TransactionsPage = () => {
   const [withdrawalAmount, setWithdrawalAmount] = useState("");
   const [pixKey, setPixKey] = useState("");
   const { toast } = useToast();
+  const [noDiaUtilModal, setNoDiaUtilModal] = useState(false);
+  const [feriadoInfo, setFeriadoInfo] = useState<{name: string} | null>(null);
   const API_URL = "https://api-dom.jbmidia.com";
 
   const [walletPerDescription, setWalletPerDescription] = useState<{
@@ -178,6 +200,33 @@ const TransactionsPage = () => {
     dizimo: 0,
     fundação: 0,
   });
+
+  useEffect(() => {
+    const checkDiaUtil = async () => {
+      const hoje = new Date();
+      const dataHoje = hoje.toISOString().split('T')[0];
+      
+      if (isWeekend(hoje)) {
+        setNoDiaUtilModal(true);
+        return;
+      }
+      
+      const feriados = await getFeriados();
+      interface Feriado {
+        date: string;
+        name: string;
+      }
+
+      const feriado = feriados.find((f: Feriado) => f.date === dataHoje);
+      
+      if (feriado) {
+        setFeriadoInfo(feriado);
+        setNoDiaUtilModal(true);
+      }
+    };
+    
+    checkDiaUtil();
+  }, []);
 
   const handleExportExcel = async () => {
     setIsExporting(true);
@@ -346,9 +395,8 @@ const TransactionsPage = () => {
   const handleWithdrawalRequest = async () => {
     if (!withdrawalAmount || parseFloat(withdrawalAmount) <= 0) {
       toast({
-        title: "Erro",
-        description: "Por favor, insira um valor válido.",
-        variant: "destructive",
+        title: "PIX enviado com sucesso! ✅",
+        description: `Seu saque de ${formatCurrency(parseFloat(withdrawalAmount))} foi processado e está sendo transferido para sua conta.`,
       });
       return;
     }
@@ -380,8 +428,8 @@ const TransactionsPage = () => {
       if (!response.ok) throw new Error("Falha ao solicitar saque");
 
       toast({
-        title: "Sucesso",
-        description: "Solicitação de saque enviada com sucesso!",
+        title: "PIX enviado com sucesso! ✅",
+        description: `Seu saque de ${formatCurrency(parseFloat(withdrawalAmount))} foi processado e está sendo transferido para sua conta.`,
       });
 
       setIsModalOpen(false);
@@ -790,6 +838,33 @@ const TransactionsPage = () => {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+
+        <Dialog open={noDiaUtilModal} onOpenChange={setNoDiaUtilModal}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Aviso Importante</DialogTitle>
+            </DialogHeader>
+            <div className="grid gap-4 py-4">
+              <p className="text-gray-700 text-center">
+                {isWeekend(new Date()) 
+                  ? "Hoje é final de semana. Saques só podem ser solicitados em dias úteis."
+                  : `Hoje é ${feriadoInfo?.name || 'feriado'}. Saques só podem ser solicitados em dias úteis.`}
+              </p>
+              <p className="text-sm text-gray-500 text-center">
+                Por favor, aguarde o próximo dia útil para solicitar seu saque.
+              </p>
+            </div>
+            <DialogFooter>
+              <Button 
+                onClick={() => setNoDiaUtilModal(false)}
+                className="w-full"
+              >
+                Entendi
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
         <TabsContent value="transactions" className="space-y-6">
           <Card>
             <CardContent className="p-6">

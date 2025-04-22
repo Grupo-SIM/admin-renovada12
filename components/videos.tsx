@@ -96,8 +96,41 @@ const VideoCategories = () => {
 
   return (
     <>
+      <style jsx>{`
+        .overlay {
+          -webkit-overflow-scrolling: touch;
+        }
+        
+        .overlay::-webkit-scrollbar {
+          width: 8px;
+          height: 8px;
+        }
+        
+        .overlay::-webkit-scrollbar-track {
+          background: #f1f1f1;
+          border-radius: 10px;
+        }
+        
+        .overlay::-webkit-scrollbar-thumb {
+          background: #888;
+          border-radius: 10px;
+        }
+        
+        .overlay::-webkit-scrollbar-thumb:hover {
+          background: #555;
+        }
+        
+        .always-show-scrollbar {
+          overflow-y: scroll !important;
+          -webkit-overflow-scrolling: touch;
+        }
+      `}</style>
+
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center space-y-4 sm:space-y-0 mb-6">
-        <div style={{overflowX:"auto", overflowY: "hidden", height: 70, marginRight: 20}} className="grid grid-cols-2 sm:flex sm:flex-row gap-2 sm:space-x-2 w-full sm:w-auto overlay">
+        <div 
+          style={{overflowX:"auto", overflowY: "hidden", height: 70, marginRight: 20}} 
+          className="grid grid-cols-2 sm:flex sm:flex-row gap-2 sm:space-x-2 w-full sm:w-auto overlay always-show-scrollbar"
+        >
           {categories.map((category) => (
             <Button
               key={category.id}

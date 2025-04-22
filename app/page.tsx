@@ -43,6 +43,11 @@ const LoginPage = () => {
     
       // On successful login
       router.push("/admin");
+      toast({
+        title: "sucesso",
+        description: "Login realizado com sucesso.",
+        variant: "destructive",
+      });
     } catch (error) {
       toast({
         title: "Erro",
