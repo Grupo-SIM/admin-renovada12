@@ -700,6 +700,21 @@ const TransactionsPage = () => {
   return (
     <div className="p-6">
       <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <div className="w-full bg-blue-50 border border-blue-200 rounded-md p-4 mb-4">
+          <div className="flex items-center">
+            <div className="flex-shrink-0">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </div>
+            <div className="ml-3">
+              <p className="text-sm font-medium text-blue-800">
+                Atenção: Saques solicitados são processados apenas em dias úteis (segunda a sexta-feira, exceto feriados). 
+                Solicitações feitas serão processadas no próximo dia útil.
+              </p>
+            </div>
+          </div>
+        </div>
         <div className="flex justify-between items-center mb-6">
           <TabsList>
             <TabsTrigger value="transactions">Transações</TabsTrigger>
@@ -721,6 +736,16 @@ const TransactionsPage = () => {
               <DialogTitle>Solicitar Saque</DialogTitle>
             </DialogHeader>
             <div className="grid gap-4 py-4">
+              {(isWeekend(new Date()) || feriadoInfo) && (
+                <div className="p-3 bg-red-50 border border-red-300 rounded-md">
+                  <p className="text-red-600 font-medium text-center">
+                    {isWeekend(new Date()) 
+                      ? "Atenção! Hoje é final de semana. O processamento do seu saque só iniciará no próximo dia útil."
+                      : `Atenção! Hoje é ${feriadoInfo?.name || 'feriado'}. O processamento do seu saque só iniciará no próximo dia útil.`}
+                  </p>
+                </div>
+              )}
+              
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="amount" className="text-right">
                   Valor
