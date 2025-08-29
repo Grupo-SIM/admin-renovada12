@@ -56,14 +56,14 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Checkbox } from "../components/ui/ceckbox";
+import { Checkbox } from "@/components/ui/ceckbox";
 
 
 import { useForm } from "react-hook-form";
 import * as z from "zod";
-import { 
+import {
 
-  CreatePrayerRequestDto 
+  CreatePrayerRequestDto
 } from "../services/prayer";
 
 interface ViewModalProps {
@@ -555,7 +555,7 @@ const AdminDashboard = () => {
         <CardTitle>Pedidos de Oração</CardTitle>
         <Button
           size="sm"
-          onClick={()=> setCreateModalOpen(true)}
+          onClick={() => setCreateModalOpen(true)}
           className="bg-blue-600 hover:bg-blue-700 w-full sm:w-auto"
         >
           <Plus className="w-4 h-4 mr-2" />
@@ -613,7 +613,7 @@ const AdminDashboard = () => {
                           size="sm"
                           onClick={() => openViewModal(request)}
                         >
-                          <Eye className="w-4 h-4" />
+                          <Edit className="w-4 h-4" />
                         </Button>
                         <Button
                           variant="ghost"

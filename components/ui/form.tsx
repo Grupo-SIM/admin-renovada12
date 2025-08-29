@@ -10,7 +10,11 @@ import {
   FormProvider,
   useForm,
   useFormContext,
+  Resolver,
+  ResolverOptions,
+  ResolverResult,
 } from "react-hook-form";
+import { z } from "zod";
 
 import { cn } from "../../utils";
 import { Label } from "../ui/global";
@@ -167,58 +171,7 @@ const FormMessage = React.forwardRef<
 });
 FormMessage.displayName = "FormMessage";
 
-export {
-  useFormField,
-  Form,
-  FormItem,
-  FormLabel,
-  FormControl,
-  FormDescription,
-  FormMessage,
-  FormField,
-};
-
-// lib/validators/video.ts
-import { z } from "zod";
-
-export const videoSchema = z.object({
-  title: z.string().min(1, {
-    message: "Title is required",
-  }),
-  videoId: z.string().min(1, {
-    message: "Video ID is required",
-  }),
-  thumb: z.string().min(1, {
-    message: "Thumbnail URL is required",
-  }),
-  type: z.enum(["MINISTRACAO", "TESTEMUNHO", "DEVOCIONAL", "PARA_FAMILIA"], {
-    required_error: "Please select a video type.",
-  }),
-});
-
-export type VideoFormValues = z.infer<typeof videoSchema>;
-
-// types/index.ts
-export interface Video {
-  id: string;
-  title: string;
-  videoId: string;
-  thumb: string;
-  type: "MINISTRACAO" | "TESTEMUNHO" | "DEVOCIONAL" | "PARA_FAMILIA";
-  createdAt: string;
-}
-
-export interface VideoCreate {
-  title: string;
-  videoId: string;
-  thumb: string;
-  type: "MINISTRACAO" | "TESTEMUNHO" | "DEVOCIONAL" | "PARA_FAMILIA";
-}
-
-
-
-import { Resolver, ResolverOptions, ResolverResult } from "react-hook-form"
-
+// Zod Resolver
 export function zodResolver<T extends z.ZodType<any, any>>(
   schema: T,
   schemaOptions?: Partial<z.ZodTypeAny>
@@ -264,6 +217,50 @@ export function zodResolver<T extends z.ZodType<any, any>>(
   }
 }
 
+// Video Schema
+export const videoSchema = z.object({
+  title: z.string().min(1, {
+    message: "Title is required",
+  }),
+  videoId: z.string().min(1, {
+    message: "Video ID is required",
+  }),
+  thumb: z.string().min(1, {
+    message: "Thumbnail URL is required",
+  }),
+  type: z.enum(["MINISTRACAO", "TESTEMUNHO", "DEVOCIONAL", "PARA_FAMILIA"], {
+    required_error: "Please select a video type.",
+  }),
+});
 
-export type VideoFormData = z.infer<typeof videoSchema>
+export type VideoFormValues = z.infer<typeof videoSchema>;
+export type VideoFormData = z.infer<typeof videoSchema>;
+
+// Video Types
+export interface Video {
+  id: string;
+  title: string;
+  videoId: string;
+  thumb: string;
+  type: "MINISTRACAO" | "TESTEMUNHO" | "DEVOCIONAL" | "PARA_FAMILIA";
+  createdAt: string;
+}
+
+export interface VideoCreate {
+  title: string;
+  videoId: string;
+  thumb: string;
+  type: "MINISTRACAO" | "TESTEMUNHO" | "DEVOCIONAL" | "PARA_FAMILIA";
+}
+
+export {
+  useFormField,
+  Form,
+  FormItem,
+  FormLabel,
+  FormControl,
+  FormDescription,
+  FormMessage,
+  FormField,
+};
 
