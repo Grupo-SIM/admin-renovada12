@@ -10,6 +10,7 @@ import {
   CalendarCheck,
   Gamepad,
   User2,
+  CreditCard,
 } from "lucide-react";
 import Header from "./header";
 import { useRouter } from "next/navigation";
@@ -72,9 +73,15 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
     },
     {
       id: "/admin/donate",
-      label: "Ofertas",
+      label: "Ofertas App",
       icon: CircleDollarSign,
       roles: "donate::admin",
+    },
+    {
+      id: "/admin/machines",
+      label: "Maquinetas",
+      icon: CreditCard,
+      roles: "admin::pray::video::study::schedule::donate::quiz",
     },
     {
       id: "/admin/quiz",
@@ -102,9 +109,8 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
 
       {/* Sidebar */}
       <aside
-        className={`fixed top-0 left-0 h-screen bg-white shadow-lg z-50 transform transition-transform duration-300 ease-in-out ${
-          isSidebarOpen ? "translate-x-0" : "-translate-x-full"
-        } lg:translate-x-0 w-64`}
+        className={`fixed top-0 left-0 h-screen bg-white shadow-lg z-50 transform transition-transform duration-300 ease-in-out ${isSidebarOpen ? "translate-x-0" : "-translate-x-full"
+          } lg:translate-x-0 w-64`}
       >
         <div className="flex items-center justify-between h-16 border-b px-4">
           <h1 className="text-xl font-bold text-blue-600">Igreja Renovada</h1>
@@ -130,11 +136,10 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
                       setCurrentSection(item.id);
                       setIsSidebarOpen(false);
                     }}
-                    className={`flex items-center w-full p-3 rounded-lg ${
-                      currentSection === item.id
-                        ? "bg-blue-50 text-blue-600"
-                        : "text-gray-700 hover:bg-gray-50"
-                    }`}
+                    className={`flex items-center w-full p-3 rounded-lg ${currentSection === item.id
+                      ? "bg-blue-50 text-blue-600"
+                      : "text-gray-700 hover:bg-gray-50"
+                      }`}
                   >
                     <item.icon className="w-5 h-5 mr-3" />
                     <span>{item.label}</span>
