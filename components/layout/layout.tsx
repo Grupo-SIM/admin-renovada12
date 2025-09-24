@@ -81,7 +81,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
       id: "/admin/machines",
       label: "Maquinetas",
       icon: CreditCard,
-      roles: "admin::pray::video::study::schedule::donate::quiz",
+      roles: "machines::admin",
     },
     {
       id: "/admin/quiz",
