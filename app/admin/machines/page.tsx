@@ -1,17 +1,6 @@
 "use client";
 import React, { useEffect, useState } from "react";
 import { CreditCard, RefreshCw, Filter, Download } from "lucide-react";
-import { Button } from "@/components/ui/global";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/global";
-import {
-    Dialog,
-    DialogContent,
-    DialogHeader,
-    DialogTitle,
-    DialogFooter,
-} from "@/components/ui/dialog";
-import { toast } from 'react-toastify';
 
 interface Transaction {
     id: string;
@@ -59,13 +48,6 @@ const MachinesPage = () => {
     const [selectedMachine, setSelectedMachine] = useState<string>("");
     const [statusFilter, setStatusFilter] = useState<string>("");
 
-    // Estados para saque
-    const [isModalOpen, setIsModalOpen] = useState(false);
-    const [withdrawalAmount, setWithdrawalAmount] = useState("");
-    const [pixKey, setPixKey] = useState("");
-    const [isWithdrawing, setIsWithdrawing] = useState(false);
-    const [noDiaUtilModal, setNoDiaUtilModal] = useState(false);
-    const [feriadoInfo, setFeriadoInfo] = useState<{ name: string } | null>(null);
 
     const fetchData = async () => {
         try {
@@ -99,88 +81,6 @@ const MachinesPage = () => {
         fetchData();
     }, []);
 
-    useEffect(() => {
-        const checkDiaUtil = async () => {
-            const hoje = new Date();
-            const dataHoje = hoje.toISOString().split('T')[0];
-
-            if (isWeekend(hoje)) {
-                setNoDiaUtilModal(true);
-                return;
-            }
-
-            const feriados = await getFeriados();
-            interface Feriado {
-                date: string;
-                name: string;
-            }
-
-            const feriado = feriados.find((f: Feriado) => f.date === dataHoje);
-
-            if (feriado) {
-                setFeriadoInfo(feriado);
-                setNoDiaUtilModal(true);
-            }
-        };
-
-        checkDiaUtil();
-    }, []);
-
-    const handleWithdrawalRequest = async () => {
-        if (!withdrawalAmount || parseFloat(withdrawalAmount) <= 0) {
-            toast.error("Por favor, insira um valor válido.");
-            return;
-        }
-
-        if (!pixKey.trim()) {
-            toast.error("Por favor, insira uma chave PIX válida.");
-            return;
-        }
-
-        if (parseFloat(withdrawalAmount) < 100) {
-            toast.error("O valor mínimo para saque deve ser de R$ 100,00");
-            return;
-        }
-
-        setIsWithdrawing(true);
-        try {
-            const response = await fetch("https://api-dom.jbmidia.com/payments/withdraw", {
-                method: "POST",
-                headers: {
-                    accept: "*/*",
-                    "x-access-token": "4a29df01-a980-45e3-b3c7-1a8b8eb7850f",
-                    "Content-Type": "application/json",
-                },
-                body: JSON.stringify({
-                    amount: parseFloat(withdrawalAmount),
-                    pixKey: pixKey.trim(),
-                }),
-            });
-
-            if (!response.ok) throw new Error("Falha ao solicitar saque");
-
-            toast.success(`PIX enviado com sucesso! ✅ Seu saque de ${formatCurrency(parseFloat(withdrawalAmount))} foi processado e está sendo transferido para sua conta.`);
-
-            setIsModalOpen(false);
-            setWithdrawalAmount("");
-            setPixKey("");
-        } catch (error) {
-            toast.error("Não foi possível solicitar o saque.");
-        } finally {
-            setIsWithdrawing(false);
-        }
-    };
-
-    const handlePixKeyChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const formattedValue = formatCPFCNPJ(e.target.value);
-        setPixKey(formattedValue);
-    };
-
-    const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const value = e.target.value.replace(/[^0-9]/g, "");
-        const formattedValue = (parseInt(value || "0") / 100).toFixed(2);
-        setWithdrawalAmount(formattedValue);
-    };
 
     const getStatusColor = (status: string) => {
         switch (status) {
@@ -221,42 +121,6 @@ const MachinesPage = () => {
         return new Date(dateString).toLocaleString("pt-BR");
     };
 
-    const formatCPFCNPJ = (value: string) => {
-        const numbersOnly = value.replace(/\D/g, "");
-
-        if (numbersOnly.length <= 11) {
-            return numbersOnly
-                .replace(/(\d{3})(\d)/, "$1.$2")
-                .replace(/(\d{3})(\d)/, "$1.$2")
-                .replace(/(\d{3})(\d{1,2})$/, "$1-$2");
-        } else {
-            return numbersOnly
-                .replace(/^(\d{2})(\d)/, "$1.$2")
-                .replace(/^(\d{2})\.(\d{3})(\d)/, "$1.$2.$3")
-                .replace(/\.(\d{3})(\d)/, ".$1/$2")
-                .replace(/(\d{4})(\d)/, "$1-$2");
-        }
-    };
-
-    const getFeriados = async () => {
-        const ano = new Date().getFullYear();
-        try {
-            const response = await fetch(`https://brasilapi.com.br/api/feriados/v1/${ano}`);
-            const data = await response.json();
-            return data.map((feriado: any) => ({
-                date: feriado.date,
-                name: feriado.name
-            }));
-        } catch (error) {
-            console.error('Erro ao buscar feriados:', error);
-            return [];
-        }
-    };
-
-    const isWeekend = (date: Date) => {
-        const day = date.getDay();
-        return day === 0 || day === 6; // 0 = domingo, 6 = sábado
-    };
 
     const filteredTransactions = data?.transactions.filter((transaction) => {
         const machineMatch = !selectedMachine ||
@@ -353,19 +217,6 @@ const MachinesPage = () => {
                         <RefreshCw className="w-4 h-4" />
                         <span>Atualizar</span>
                     </button>
-                    <div className="relative group">
-                        <button
-                            disabled
-                            className="flex items-center space-x-2 px-4 py-2 bg-gray-400 text-gray-200 rounded-lg cursor-not-allowed opacity-50"
-                        >
-                            <CreditCard className="w-4 h-4" />
-                            <span>Solicitar Saque</span>
-                        </button>
-                        <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-1 bg-gray-800 text-white text-sm rounded-lg whitespace-nowrap z-50 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none">
-                            Em breve
-                            <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-800"></div>
-                        </div>
-                    </div>
                     <button
                         onClick={exportToCSV}
                         className="flex items-center space-x-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
@@ -532,128 +383,6 @@ const MachinesPage = () => {
                 </div>
             </div>
 
-            {/* Modal de Saque */}
-            <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-                <DialogContent>
-                    <DialogHeader>
-                        <DialogTitle>Solicitar Saque</DialogTitle>
-                    </DialogHeader>
-                    <div className="grid gap-4 py-4">
-                        {(isWeekend(new Date()) || feriadoInfo) && (
-                            <div className="p-3 bg-red-50 border border-red-300 rounded-md">
-                                <p className="text-red-600 font-medium text-center">
-                                    {isWeekend(new Date())
-                                        ? "Atenção! Hoje é final de semana. O processamento do seu saque só iniciará no próximo dia útil."
-                                        : `Atenção! Hoje é ${feriadoInfo?.name || 'feriado'}. O processamento do seu saque só iniciará no próximo dia útil.`}
-                                </p>
-                            </div>
-                        )}
-
-                        <div className="grid grid-cols-4 items-center gap-4">
-                            <Label htmlFor="amount" className="text-right">
-                                Valor
-                            </Label>
-                            <div className="col-span-3 relative">
-                                <div className="flex items-center justify-center gap-2">
-                                    <span className="absolute left-3">R$</span>
-                                    <Input
-                                        id="amount"
-                                        type="text"
-                                        value={withdrawalAmount}
-                                        onChange={handleAmountChange}
-                                        className="pl-8"
-                                        placeholder="0,00"
-                                    />
-                                </div>
-                                <p className="text-sm text-gray-500 mt-1">
-                                    Saldo disponível: {formatCurrency(
-                                        data?.transactions.reduce((sum, t) => sum + t.profit_minus_tax, 0) || 0
-                                    )}
-                                </p>
-                            </div>
-                        </div>
-                        <div className="grid grid-cols-4 items-center gap-4">
-                            <Label htmlFor="pixKey" className="text-right">
-                                PIX (CPF/CNPJ)
-                            </Label>
-                            <div className="col-span-3">
-                                <Input
-                                    id="pixKey"
-                                    type="text"
-                                    value={pixKey}
-                                    onChange={handlePixKeyChange}
-                                    placeholder="Digite seu CPF ou CNPJ"
-                                />
-                            </div>
-                        </div>
-                        <p className="text-sm text-gray-500 text-center">
-                            Será cobrada uma taxa de R$ 2,00 por saque
-                        </p>
-                        <p className="text-sm text-red-500 font-medium text-center mt-1">
-                            O valor mínimo para saque deve ser de R$ 100,00
-                        </p>
-                    </div>
-                    <DialogFooter>
-                        <Button
-                            variant="outline"
-                            onClick={() => {
-                                setIsModalOpen(false);
-                                setPixKey("");
-                                setWithdrawalAmount("");
-                            }}
-                            disabled={isWithdrawing}
-                        >
-                            Cancelar
-                        </Button>
-                        <Button
-                            onClick={handleWithdrawalRequest}
-                            disabled={
-                                isWithdrawing ||
-                                !withdrawalAmount ||
-                                !pixKey ||
-                                parseFloat(withdrawalAmount) < 100
-                            }
-                            className="bg-green-600 hover:bg-green-700 text-white"
-                        >
-                            {isWithdrawing ? (
-                                <>
-                                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
-                                    Processando...
-                                </>
-                            ) : (
-                                "Confirmar"
-                            )}
-                        </Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
-
-            {/* Modal de Dia Não Útil */}
-            <Dialog open={noDiaUtilModal} onOpenChange={setNoDiaUtilModal}>
-                <DialogContent>
-                    <DialogHeader>
-                        <DialogTitle>Aviso Importante</DialogTitle>
-                    </DialogHeader>
-                    <div className="grid gap-4 py-4">
-                        <p className="text-gray-700 text-center">
-                            {isWeekend(new Date())
-                                ? "Hoje é final de semana. Saques só podem ser solicitados em dias úteis."
-                                : `Hoje é ${feriadoInfo?.name || 'feriado'}. Saques só podem ser solicitados em dias úteis.`}
-                        </p>
-                        <p className="text-sm text-gray-500 text-center">
-                            Por favor, aguarde o próximo dia útil para solicitar seu saque.
-                        </p>
-                    </div>
-                    <DialogFooter>
-                        <Button
-                            onClick={() => setNoDiaUtilModal(false)}
-                            className="w-full"
-                        >
-                            Entendi
-                        </Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
         </div>
     );
 };

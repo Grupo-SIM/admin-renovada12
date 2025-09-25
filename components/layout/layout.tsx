@@ -11,6 +11,7 @@ import {
   Gamepad,
   User2,
   CreditCard,
+  Wallet,
 } from "lucide-react";
 import Header from "./header";
 import { useRouter } from "next/navigation";
@@ -82,6 +83,12 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
       label: "Maquinetas",
       icon: CreditCard,
       roles: "machines::admin",
+    },
+    {
+      id: "/admin/withdraw",
+      label: "Saque",
+      icon: Wallet,
+      roles: "withdraw::admin",
     },
     {
       id: "/admin/quiz",
