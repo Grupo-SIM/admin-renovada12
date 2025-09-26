@@ -229,7 +229,7 @@ const MachinesPage = () => {
 
             {/* Stats */}
             {data && (
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="bg-white p-6 rounded-lg shadow">
                         <div className="flex items-center">
                             <div className="p-2 bg-blue-100 rounded-lg">
@@ -252,7 +252,7 @@ const MachinesPage = () => {
                             </div>
                         </div>
                     </div>
-                    <div className="bg-white p-6 rounded-lg shadow">
+                    {/* <div className="bg-white p-6 rounded-lg shadow">
                         <div className="flex items-center">
                             <div className="p-2 bg-purple-100 rounded-lg">
                                 <CreditCard className="w-6 h-6 text-purple-600" />
@@ -266,7 +266,7 @@ const MachinesPage = () => {
                                 </p>
                             </div>
                         </div>
-                    </div>
+                    </div> */}
                 </div>
             )}
 

@@ -322,8 +322,8 @@ const TransactionsPage = () => {
 
 
   const renderSummaryCards = () => (
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-      <Card>
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+     {/*  <Card>
         <CardContent className="p-6">
           <div className="flex items-center justify-between">
             <div>
@@ -349,9 +349,9 @@ const TransactionsPage = () => {
             </div>
           </div>
         </CardContent>
-      </Card>
+      </Card> */}
 
-      <Card>
+      {/* <Card>
         <CardContent className="p-6">
           <div className="flex items-center justify-between">
             <div>
@@ -385,7 +385,7 @@ const TransactionsPage = () => {
             </div>
           </div>
         </CardContent>
-      </Card>
+      </Card> */}
     </div>
   );
 
