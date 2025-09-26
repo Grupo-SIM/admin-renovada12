@@ -62,23 +62,6 @@ interface Transaction {
   updatedAt: string;
 }
 
-interface Withdrawal {
-  id: string;
-  userId: string;
-  amount: number;
-  status: "PENDING" | "COMPLETED" | "FAILED" | "APPROVED";
-  pixKey: string;
-  createdAt: string;
-  user: {
-    name: string;
-    email: string;
-  };
-}
-
-interface WithdrawalResponse {
-  withdrawals: Withdrawal[];
-  meta: PaginationMeta;
-}
 
 interface FinancialSummary {
   availableBalance: number;
@@ -158,7 +141,6 @@ const isWeekend = (date: Date) => {
 const TransactionsPage = () => {
   const [activeTab, setActiveTab] = useState("transactions");
   const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [withdrawals, setWithdrawals] = useState<Withdrawal[]>([]);
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
@@ -177,13 +159,6 @@ const TransactionsPage = () => {
     totalItems: 0,
     totalPages: 1,
   });
-  const [withdrawalsPaginationMeta, setWithdrawalsPaginationMeta] =
-    useState<PaginationMeta>({
-      currentPage: 1,
-      itemsPerPage: 10,
-      totalItems: 0,
-      totalPages: 1,
-    });
   const [isLoading, setIsLoading] = useState(false);
   const API_URL = "https://api-dom.jbmidia.com";
 
@@ -260,11 +235,7 @@ const TransactionsPage = () => {
   };
 
   useEffect(() => {
-    if (activeTab === "withdrawals") {
-      fetchWithdrawals(1);
-    } else {
-      fetchTransactions(1);
-    }
+    fetchTransactions(1);
     setIsLoadingBalances(true);
     fetchFinancialSummary();
     fetchMachinesBalance();
@@ -348,28 +319,6 @@ const TransactionsPage = () => {
     }
   };
 
-  const fetchWithdrawals = async (page = 1) => {
-    setIsLoading(true);
-    try {
-      const response = await fetch(
-        `${API_URL}/payments/withdrawals?page=${page}&limit=${withdrawalsPaginationMeta.itemsPerPage}`,
-        {
-          headers: {
-            accept: "*/*",
-            "x-access-token": "4a29df01-a980-45e3-b3c7-1a8b8eb7850f",
-            "Content-Type": "application/json",
-          },
-        }
-      );
-      const data: WithdrawalResponse = await response.json();
-      setWithdrawals(data.withdrawals);
-      setWithdrawalsPaginationMeta(data.meta);
-    } catch (error) {
-      toast.error("Não foi possível carregar os saques.");
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
 
   const renderSummaryCards = () => (
@@ -389,7 +338,8 @@ const TransactionsPage = () => {
                 ) : (
                   (() => {
                     const calculatedBalance = financialSummary.availableBalance - machinesBalance;
-                    return formatCurrency(calculatedBalance);
+                    const finalBalance = calculatedBalance < 0 ? financialSummary.availableBalance : calculatedBalance;
+                    return formatCurrency(finalBalance);
                   })()
                 )}
               </h3>
@@ -596,62 +546,6 @@ const TransactionsPage = () => {
     </div>
   );
 
-  const renderWithdrawalsTable = () => (
-    <div className="overflow-auto">
-      <div className="rounded-md border min-w-[800px] lg:min-w-full">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead className="w-[100px] lg:w-auto">Data</TableHead>
-              <TableHead className="w-[100px] lg:w-auto">Nome</TableHead>
-              <TableHead className="w-[100px] lg:w-auto">Email</TableHead>
-              <TableHead className="w-[120px] lg:w-auto">Valor</TableHead>
-              <TableHead className="w-[120px] lg:w-auto">Chave PIX</TableHead>
-              <TableHead className="w-[100px] lg:w-auto">Status</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {withdrawals.map((withdrawal) => (
-              <TableRow key={withdrawal.id}>
-                <TableCell className="whitespace-nowrap">
-                  {new Date(withdrawal.createdAt).toLocaleDateString("pt-BR")}
-                </TableCell>
-                <TableCell className="font-mono text-sm whitespace-nowrap">
-                  {withdrawal.user.name}
-                </TableCell>
-                <TableCell className="font-mono text-sm whitespace-nowrap">
-                  {withdrawal.user.email}
-                </TableCell>
-                <TableCell className="whitespace-nowrap">
-                  {formatCurrency(withdrawal.amount)}
-                </TableCell>
-                <TableCell className="font-mono text-sm whitespace-nowrap">
-                  {withdrawal.pixKey}
-                </TableCell>
-                <TableCell>
-                  <Badge
-                    className={`whitespace-nowrap ${getStatusColor(
-                      withdrawal.status
-                    )}`}
-                  >
-                    {withdrawal.status}
-                  </Badge>
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </div>
-      {withdrawals.length > 0 &&
-        renderPagination(
-          withdrawalsPaginationMeta.currentPage,
-          withdrawalsPaginationMeta.totalPages,
-          withdrawalsPaginationMeta.totalItems,
-          withdrawalsPaginationMeta.itemsPerPage,
-          (page) => fetchWithdrawals(page)
-        )}
-    </div>
-  );
 
   return (
     <div className="p-6">
@@ -673,7 +567,6 @@ const TransactionsPage = () => {
         <div className="flex justify-between items-center mb-6">
           <TabsList>
             <TabsTrigger value="transactions">Transações</TabsTrigger>
-            <TabsTrigger value="withdrawals">Histórico de saques</TabsTrigger>
           </TabsList>
 
         </div>
@@ -772,16 +665,6 @@ const TransactionsPage = () => {
           )}
         </TabsContent>
 
-        <TabsContent value="withdrawals" className="space-y-6">
-          {renderSummaryCards()}
-          {isLoading ? (
-            <div className="flex justify-center items-center h-40">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" />
-            </div>
-          ) : (
-            renderWithdrawalsTable()
-          )}
-        </TabsContent>
       </Tabs>
     </div>
   );

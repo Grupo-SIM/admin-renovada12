@@ -1,6 +1,6 @@
 "use client";
 import React, { useEffect, useState } from "react";
-import { Wallet, RefreshCw, DollarSign, ArrowUpRight, ArrowDownLeft } from "lucide-react";
+import { Wallet, RefreshCw, DollarSign, ArrowUpRight, ArrowDownLeft, History } from "lucide-react";
 import { Button } from "@/components/ui/global";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/global";
@@ -26,10 +26,41 @@ interface FinancialSummary {
     };
 }
 
+interface Withdrawal {
+    id: string;
+    userId: string;
+    amount: number;
+    status: "PENDING" | "COMPLETED" | "FAILED" | "APPROVED";
+    pixKey: string;
+    createdAt: string;
+    user: {
+        name: string;
+        email: string;
+    };
+}
+
+interface WithdrawalResponse {
+    withdrawals: Withdrawal[];
+    meta: {
+        currentPage: number;
+        itemsPerPage: number;
+        totalItems: number;
+        totalPages: number;
+    };
+}
+
 const WithdrawPage = () => {
     const [financialSummary, setFinancialSummary] = useState<FinancialSummary | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const [withdrawals, setWithdrawals] = useState<Withdrawal[]>([]);
+    const [withdrawalsPaginationMeta, setWithdrawalsPaginationMeta] = useState({
+        currentPage: 1,
+        itemsPerPage: 10,
+        totalItems: 0,
+        totalPages: 1,
+    });
+    const [activeTab, setActiveTab] = useState("summary");
 
     // Estados para saque
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -66,7 +97,28 @@ const WithdrawPage = () => {
 
     useEffect(() => {
         fetchFinancialSummary();
+        fetchWithdrawals(1);
     }, []);
+
+    const fetchWithdrawals = async (page = 1) => {
+        try {
+            const response = await fetch(
+                `https://api-dom.jbmidia.com/payments/withdrawals?page=${page}&limit=${withdrawalsPaginationMeta.itemsPerPage}`,
+                {
+                    headers: {
+                        accept: "*/*",
+                        "x-access-token": "4a29df01-a980-45e3-b3c7-1a8b8eb7850f",
+                        "Content-Type": "application/json",
+                    },
+                }
+            );
+            const data: WithdrawalResponse = await response.json();
+            setWithdrawals(data.withdrawals);
+            setWithdrawalsPaginationMeta(data.meta);
+        } catch (error) {
+            console.error("Erro ao carregar histórico de saques:", error);
+        }
+    };
 
     const formatCurrency = (value: number) => {
         return new Intl.NumberFormat("pt-BR", {
@@ -279,70 +331,185 @@ const WithdrawPage = () => {
                 </div>
             </div>
 
-            {/* Cards de Saldo */}
-            {financialSummary && (
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    <div className="bg-white p-6 rounded-lg shadow">
-                        <div className="flex items-center">
-                            <div className="p-2 bg-green-100 rounded-lg">
-                                <DollarSign className="w-6 h-6 text-green-600" />
-                            </div>
-                            <div className="ml-4">
-                                <p className="text-sm font-medium text-gray-600">Saldo disponível</p>
-                                <p className="text-2xl font-bold text-gray-900">
-                                    {formatCurrency(financialSummary.availableBalance)}
-                                </p>
-                            </div>
+            {/* Abas */}
+            <div className="border-b border-gray-200">
+                <nav className="-mb-px flex space-x-8">
+                    <button
+                        onClick={() => setActiveTab("summary")}
+                        className={`py-2 px-1 border-b-2 font-medium text-sm ${activeTab === "summary"
+                            ? "border-blue-500 text-blue-600"
+                            : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+                            }`}
+                    >
+                        <div className="flex items-center space-x-2">
+                            <Wallet className="w-4 h-4" />
+                            <span>Resumo</span>
                         </div>
-                    </div>
+                    </button>
+                    <button
+                        onClick={() => setActiveTab("history")}
+                        className={`py-2 px-1 border-b-2 font-medium text-sm ${activeTab === "history"
+                            ? "border-blue-500 text-blue-600"
+                            : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+                            }`}
+                    >
+                        <div className="flex items-center space-x-2">
+                            <History className="w-4 h-4" />
+                            <span>Histórico de Saques</span>
+                        </div>
+                    </button>
+                </nav>
+            </div>
 
-                    <div className="bg-white p-6 rounded-lg shadow">
-                        <div className="flex items-center">
-                            <div className="p-2 bg-yellow-100 rounded-lg">
-                                <ArrowUpRight className="w-6 h-6 text-yellow-600" />
+            {/* Conteúdo das Abas */}
+            {activeTab === "summary" && (
+                <>
+                    {/* Cards de Saldo */}
+                    {financialSummary && (
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                            <div className="bg-white p-6 rounded-lg shadow">
+                                <div className="flex items-center">
+                                    <div className="p-2 bg-green-100 rounded-lg">
+                                        <DollarSign className="w-6 h-6 text-green-600" />
+                                    </div>
+                                    <div className="ml-4">
+                                        <p className="text-sm font-medium text-gray-600">Saldo disponível</p>
+                                        <p className="text-2xl font-bold text-gray-900">
+                                            {formatCurrency(financialSummary.availableBalance)}
+                                        </p>
+                                    </div>
+                                </div>
                             </div>
-                            <div className="ml-4">
-                                <p className="text-sm font-medium text-gray-600">Saque em processo</p>
-                                <p className="text-2xl font-bold text-gray-900">
-                                    {formatCurrency(financialSummary.pendingWithdraws)}
-                                </p>
-                            </div>
-                        </div>
-                    </div>
 
-                    <div className="bg-white p-6 rounded-lg shadow">
-                        <div className="flex items-center">
-                            <div className="p-2 bg-blue-100 rounded-lg">
-                                <ArrowDownLeft className="w-6 h-6 text-blue-600" />
+                            <div className="bg-white p-6 rounded-lg shadow">
+                                <div className="flex items-center">
+                                    <div className="p-2 bg-yellow-100 rounded-lg">
+                                        <ArrowUpRight className="w-6 h-6 text-yellow-600" />
+                                    </div>
+                                    <div className="ml-4">
+                                        <p className="text-sm font-medium text-gray-600">Saque em processo</p>
+                                        <p className="text-2xl font-bold text-gray-900">
+                                            {formatCurrency(financialSummary.pendingWithdraws)}
+                                        </p>
+                                    </div>
+                                </div>
                             </div>
-                            <div className="ml-4">
-                                <p className="text-sm font-medium text-gray-600">Saldo em processamento</p>
-                                <p className="text-2xl font-bold text-gray-900">
-                                    {formatCurrency(financialSummary.lockedBalance)}
-                                </p>
+
+                            <div className="bg-white p-6 rounded-lg shadow">
+                                <div className="flex items-center">
+                                    <div className="p-2 bg-blue-100 rounded-lg">
+                                        <ArrowDownLeft className="w-6 h-6 text-blue-600" />
+                                    </div>
+                                    <div className="ml-4">
+                                        <p className="text-sm font-medium text-gray-600">Saldo em processamento</p>
+                                        <p className="text-2xl font-bold text-gray-900">
+                                            {formatCurrency(financialSummary.lockedBalance)}
+                                        </p>
+                                    </div>
+                                </div>
                             </div>
                         </div>
-                    </div>
-                </div>
+                    )}
+
+                    {/* Informações da Carteira */}
+                    {financialSummary && (
+                        <div className="bg-white p-6 rounded-lg shadow">
+                            <h3 className="text-lg font-semibold text-gray-900 mb-4">Informações da Carteira</h3>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <p className="text-sm font-medium text-gray-600">Última atualização</p>
+                                    <p className="text-gray-900">{formatDate(financialSummary.wallet.updatedAt)}</p>
+                                </div>
+                                <div>
+                                    <p className="text-sm font-medium text-gray-600">Último saque</p>
+                                    <p className="text-gray-900">
+                                        {financialSummary.wallet.lastWithDrawDate
+                                            ? formatDate(financialSummary.wallet.lastWithDrawDate)
+                                            : "Nenhum saque realizado"
+                                        }
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </>
             )}
 
-            {/* Informações da Carteira */}
-            {financialSummary && (
-                <div className="bg-white p-6 rounded-lg shadow">
-                    <h3 className="text-lg font-semibold text-gray-900 mb-4">Informações da Carteira</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                            <p className="text-sm font-medium text-gray-600">Última atualização</p>
-                            <p className="text-gray-900">{formatDate(financialSummary.wallet.updatedAt)}</p>
+            {activeTab === "history" && (
+                <div className="space-y-6">
+                    <div className="bg-white rounded-lg shadow">
+                        <div className="px-6 py-4 border-b border-gray-200">
+                            <h3 className="text-lg font-semibold text-gray-900">Histórico de Saques</h3>
                         </div>
-                        <div>
-                            <p className="text-sm font-medium text-gray-600">Último saque</p>
-                            <p className="text-gray-900">
-                                {financialSummary.wallet.lastWithDrawDate
-                                    ? formatDate(financialSummary.wallet.lastWithDrawDate)
-                                    : "Nenhum saque realizado"
-                                }
-                            </p>
+                        <div className="overflow-x-auto">
+                            <table className="min-w-full divide-y divide-gray-200">
+                                <thead className="bg-gray-50">
+                                    <tr>
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                            Data
+                                        </th>
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                            Nome
+                                        </th>
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                            Email
+                                        </th>
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                            Valor
+                                        </th>
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                            Chave PIX
+                                        </th>
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                            Status
+                                        </th>
+                                    </tr>
+                                </thead>
+                                <tbody className="bg-white divide-y divide-gray-200">
+                                    {withdrawals.map((withdrawal) => (
+                                        <tr key={withdrawal.id}>
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                                {new Date(withdrawal.createdAt).toLocaleDateString("pt-BR")}
+                                            </td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                                                {withdrawal.user.name}
+                                            </td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                                {withdrawal.user.email}
+                                            </td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                                {formatCurrency(withdrawal.amount)}
+                                            </td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                                {withdrawal.pixKey}
+                                            </td>
+                                            <td className="px-6 py-4 whitespace-nowrap">
+                                                <span
+                                                    className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${withdrawal.status === "COMPLETED"
+                                                        ? "bg-green-100 text-green-800"
+                                                        : withdrawal.status === "PENDING"
+                                                            ? "bg-yellow-100 text-yellow-800"
+                                                            : withdrawal.status === "FAILED"
+                                                                ? "bg-red-100 text-red-800"
+                                                                : "bg-blue-100 text-blue-800"
+                                                        }`}
+                                                >
+                                                    {withdrawal.status}
+                                                </span>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                            {withdrawals.length === 0 && (
+                                <div className="text-center py-8">
+                                    <History className="mx-auto h-12 w-12 text-gray-400" />
+                                    <h3 className="mt-2 text-sm font-medium text-gray-900">Nenhum saque encontrado</h3>
+                                    <p className="mt-1 text-sm text-gray-500">
+                                        Não há histórico de saques para exibir.
+                                    </p>
+                                </div>
+                            )}
                         </div>
                     </div>
                 </div>
@@ -378,8 +545,8 @@ const WithdrawPage = () => {
                                         value={withdrawalAmount}
                                         onChange={handleAmountChange}
                                         className={`pl-8 ${parseFloat(withdrawalAmount) > (financialSummary?.availableBalance || 0) - 2
-                                                ? "border-red-500 focus:ring-red-500"
-                                                : ""
+                                            ? "border-red-500 focus:ring-red-500"
+                                            : ""
                                             }`}
                                         placeholder="0,00"
                                     />
