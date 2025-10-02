@@ -1,6 +1,6 @@
 "use client";
 import React, { useEffect, useState } from "react";
-import { Wallet, RefreshCw, DollarSign, ArrowUpRight, ArrowDownLeft, History } from "lucide-react";
+import { Wallet, RefreshCw, DollarSign, ArrowUpRight, ArrowDownLeft, History, FileText, Download, Eye } from "lucide-react";
 import { Button } from "@/components/ui/global";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/global";
@@ -32,7 +32,10 @@ interface Withdrawal {
     amount: number;
     status: "PENDING" | "COMPLETED" | "FAILED" | "APPROVED";
     pixKey: string;
+    receiptImage?: string;
+    fee?: string;
     createdAt: string;
+    updatedAt: string;
     user: {
         name: string;
         email: string;
@@ -69,6 +72,8 @@ const WithdrawPage = () => {
     const [isWithdrawing, setIsWithdrawing] = useState(false);
     const [noDiaUtilModal, setNoDiaUtilModal] = useState(false);
     const [feriadoInfo, setFeriadoInfo] = useState<{ name: string } | null>(null);
+    const [isReceiptModalOpen, setIsReceiptModalOpen] = useState(false);
+    const [selectedReceiptImage, setSelectedReceiptImage] = useState("");
     const [hasPendingWithdrawal, setHasPendingWithdrawal] = useState(false);
     const [pendingWithdrawal, setPendingWithdrawal] = useState<Withdrawal | null>(null);
 
@@ -117,7 +122,7 @@ const WithdrawPage = () => {
             const data: WithdrawalResponse = await response.json();
             setWithdrawals(data.withdrawals);
             setWithdrawalsPaginationMeta(data.meta);
-            
+
             // Verificar se há saque pendente
             checkPendingWithdrawal(data.withdrawals);
         } catch (error) {
@@ -128,7 +133,7 @@ const WithdrawPage = () => {
     const checkPendingWithdrawal = (withdrawals: Withdrawal[]) => {
         // Procurar por saque pendente (apenas PENDING)
         const pending = withdrawals.find(w => w.status === "PENDING");
-        
+
         if (pending) {
             setHasPendingWithdrawal(true);
             setPendingWithdrawal(pending);
@@ -143,6 +148,29 @@ const WithdrawPage = () => {
             style: "currency",
             currency: "BRL",
         }).format(value);
+    };
+
+    const downloadImage = async (url: string, filename: string) => {
+        try {
+            const response = await fetch(url);
+            const blob = await response.blob();
+            const downloadUrl = window.URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = downloadUrl;
+            link.download = filename || 'nota-fiscal.png';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            window.URL.revokeObjectURL(downloadUrl);
+        } catch (error) {
+            console.error('Erro ao baixar imagem:', error);
+            toast.error('Erro ao baixar a nota fiscal');
+        }
+    };
+
+    const openReceiptModal = (imageUrl: string) => {
+        setSelectedReceiptImage(imageUrl);
+        setIsReceiptModalOpen(true);
     };
 
     const formatDate = (dateString: string) => {
@@ -331,11 +359,10 @@ const WithdrawPage = () => {
                     <button
                         onClick={() => setIsModalOpen(true)}
                         disabled={hasPendingWithdrawal}
-                        className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition-colors ${
-                            hasPendingWithdrawal
-                                ? "bg-gray-400 text-gray-200 cursor-not-allowed"
-                                : "bg-green-600 text-white hover:bg-green-700"
-                        }`}
+                        className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition-colors ${hasPendingWithdrawal
+                            ? "bg-gray-400 text-gray-200 cursor-not-allowed"
+                            : "bg-green-600 text-white hover:bg-green-700"
+                            }`}
                     >
                         <Wallet className="w-4 h-4" />
                         <span>{hasPendingWithdrawal ? "Saque Pendente" : "Solicitar Saque"}</span>
@@ -513,6 +540,9 @@ const WithdrawPage = () => {
                                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                             Status
                                         </th>
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                            Nota Fiscal
+                                        </th>
                                     </tr>
                                 </thead>
                                 <tbody className="bg-white divide-y divide-gray-200">
@@ -547,10 +577,47 @@ const WithdrawPage = () => {
                                                         }`}
                                                 >
                                                     {withdrawal.status === "COMPLETED" ? "Concluído" :
-                                                     withdrawal.status === "PENDING" ? "Aguardando Aprovação" :
-                                                     withdrawal.status === "APPROVED" ? "Aprovado - Processando" :
-                                                     withdrawal.status === "FAILED" ? "Falhou" : withdrawal.status}
+                                                        withdrawal.status === "PENDING" ? "Aguardando Aprovação" :
+                                                            withdrawal.status === "APPROVED" ? "Aprovado - Processando" :
+                                                                withdrawal.status === "FAILED" ? "Falhou" : withdrawal.status}
                                                 </span>
+                                            </td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                                {withdrawal.receiptImage ? (
+                                                    <div className="flex items-center space-x-3">
+                                                        {/* Botões de Ação */}
+                                                        <div className="flex space-x-2">
+                                                            {/* Botão Visualizar */}
+                                                            <Button
+                                                                size="sm"
+                                                                variant="outline"
+                                                                onClick={() => openReceiptModal(withdrawal.receiptImage!)}
+                                                                className="flex items-center space-x-1 text-xs px-3 py-1.5 h-8 bg-white hover:bg-gray-50 border-gray-300 text-gray-700 hover:text-gray-900"
+                                                            >
+                                                                <Eye className="w-3 h-3" />
+                                                                <span>Ver</span>
+                                                            </Button>
+
+                                                            {/* Botão Download */}
+                                                            <Button
+                                                                size="sm"
+                                                                variant="outline"
+                                                                onClick={() => downloadImage(withdrawal.receiptImage!, `nota-fiscal-${withdrawal.id.slice(-8)}.png`)}
+                                                                className="flex items-center space-x-1 text-xs px-3 py-1.5 h-8 bg-white hover:bg-green-50 border-green-300 text-green-700 hover:text-green-900"
+                                                            >
+                                                                <Download className="w-3 h-3" />
+                                                                <span>Baixar</span>
+                                                            </Button>
+                                                        </div>
+                                                    </div>
+                                                ) : (
+                                                    <div className="flex items-center space-x-2">
+                                                        <div className="flex items-center justify-center w-10 h-10 bg-gray-50 rounded-lg border border-gray-200">
+                                                            <FileText className="w-5 h-5 text-gray-400" />
+                                                        </div>
+                                                        <span className="text-gray-400 text-sm">Não disponível</span>
+                                                    </div>
+                                                )}
                                             </td>
                                         </tr>
                                     ))}
@@ -580,11 +647,11 @@ const WithdrawPage = () => {
                         {hasPendingWithdrawal && (
                             <div className="p-3 bg-yellow-50 border border-yellow-300 rounded-md">
                                 <p className="text-yellow-600 font-medium text-center">
-                                    Você já possui um saque pendente de aprovação. Aguarde a aprovação para solicitar um novo saque.
+                                    Você já possui um saque pendente. Por favor, aguarde a aprovação antes de solicitar um novo saque.
                                 </p>
                             </div>
                         )}
-                        
+
                         {(isWeekend(new Date()) || feriadoInfo) && !hasPendingWithdrawal && (
                             <div className="p-3 bg-red-50 border border-red-300 rounded-md">
                                 <p className="text-red-600 font-medium text-center">
@@ -665,11 +732,10 @@ const WithdrawPage = () => {
                                 parseFloat(withdrawalAmount) < 100 ||
                                 parseFloat(withdrawalAmount) > (financialSummary?.availableBalance || 0) - 2
                             }
-                            className={`${
-                                hasPendingWithdrawal
-                                    ? "bg-gray-400 hover:bg-gray-400 cursor-not-allowed"
-                                    : "bg-green-600 hover:bg-green-700"
-                            } text-white`}
+                            className={`${hasPendingWithdrawal
+                                ? "bg-gray-400 hover:bg-gray-400 cursor-not-allowed"
+                                : "bg-green-600 hover:bg-green-700"
+                                } text-white`}
                         >
                             {isWithdrawing ? (
                                 <>
@@ -709,6 +775,56 @@ const WithdrawPage = () => {
                         >
                             Entendi
                         </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* Modal de Visualização da Nota Fiscal */}
+            <Dialog open={isReceiptModalOpen} onOpenChange={setIsReceiptModalOpen}>
+                <DialogContent className="max-w-4xl max-h-[90vh]">
+                    <DialogHeader>
+                        <DialogTitle className="flex items-center space-x-2">
+                            <FileText className="w-5 h-5 text-blue-600" />
+                            <span>Nota Fiscal</span>
+                        </DialogTitle>
+                    </DialogHeader>
+                    <div className="flex flex-col items-center space-y-4 py-4">
+                        {selectedReceiptImage && (
+                            <div className="w-full flex justify-center">
+                                <img
+                                    src={selectedReceiptImage}
+                                    alt="Nota Fiscal"
+                                    className="max-w-full max-h-[70vh] object-contain rounded-lg border shadow-lg"
+                                    onError={(e) => {
+                                        e.currentTarget.style.display = 'none';
+                                        e.currentTarget.nextElementSibling?.classList.remove('hidden');
+                                    }}
+                                />
+                                <div className="hidden items-center justify-center p-8 text-center">
+                                    <FileText className="w-16 h-16 text-gray-400 mb-4" />
+                                    <p className="text-gray-500 text-lg">Erro ao carregar a imagem</p>
+                                    <p className="text-gray-400 text-sm">A nota fiscal não pôde ser exibida</p>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                    <DialogFooter className="flex space-x-2">
+                        <Button
+                            variant="outline"
+                            onClick={() => setIsReceiptModalOpen(false)}
+                            className="flex-1"
+                        >
+                            Fechar
+                        </Button>
+                        {selectedReceiptImage && (
+                            <Button
+                                onClick={() => downloadImage(selectedReceiptImage, `nota-fiscal-${Date.now()}.png`)}
+                                className="flex-1 bg-green-600 hover:bg-green-700 text-white"
+                            >
+                                <Download className="w-4 h-4 mr-2" />
+                                Baixar
+                            </Button>
+                        )}
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
