@@ -1,6 +1,7 @@
 "use client";
 import React, { useEffect, useState } from "react";
-import { CreditCard, RefreshCw, Filter, Download } from "lucide-react";
+import { CreditCard, RefreshCw, Filter, Download, Calendar } from "lucide-react";
+import { DatePicker } from "@/components/ui/date-picker";
 
 interface Transaction {
     id: string;
@@ -47,6 +48,8 @@ const MachinesPage = () => {
     const [error, setError] = useState<string | null>(null);
     const [selectedMachine, setSelectedMachine] = useState<string>("");
     const [statusFilter, setStatusFilter] = useState<string>("");
+    const [startDate, setStartDate] = useState<Date | undefined>(undefined);
+    const [endDate, setEndDate] = useState<Date | undefined>(undefined);
 
 
     const fetchData = async () => {
@@ -118,15 +121,28 @@ const MachinesPage = () => {
     };
 
     const formatDate = (dateString: string) => {
-        return new Date(dateString).toLocaleString("pt-BR");
+        return new Date(dateString).toLocaleDateString("pt-BR", {
+            day: "2-digit",
+            month: "2-digit",
+            year: "2-digit",
+            hour: "2-digit",
+            minute: "2-digit"
+        });
     };
+
 
 
     const filteredTransactions = data?.transactions.filter((transaction) => {
         const machineMatch = !selectedMachine ||
             transaction.customer_name.includes(`Terminal: ${selectedMachine}`);
         const statusMatch = !statusFilter || transaction.status === statusFilter;
-        return machineMatch && statusMatch;
+
+        // Filtro por data
+        const transactionDate = new Date(transaction.created_at);
+        const startDateFilter = !startDate || transactionDate >= startDate;
+        const endDateFilter = !endDate || transactionDate <= new Date(endDate.getTime() + 24 * 60 * 60 * 1000 - 1); // Fim do dia
+
+        return machineMatch && statusMatch && startDateFilter && endDateFilter;
     }) || [];
 
     const exportToCSV = () => {
@@ -158,11 +174,33 @@ const MachinesPage = () => {
             ].join(","))
         ].join("\n");
 
+        const formatDateForFilename = (date: Date) => {
+            return date.toLocaleDateString("pt-BR", {
+                day: "2-digit",
+                month: "2-digit",
+                year: "2-digit"
+            }).replace(/\//g, "-");
+        };
+
+        const dateRange = startDate && endDate
+            ? `_${formatDateForFilename(startDate)}_a_${formatDateForFilename(endDate)}`
+            : startDate
+                ? `_${formatDateForFilename(startDate)}`
+                : endDate
+                    ? `_ate_${formatDateForFilename(endDate)}`
+                    : "";
+
+        const currentDate = new Date().toLocaleDateString("pt-BR", {
+            day: "2-digit",
+            month: "2-digit",
+            year: "2-digit"
+        }).replace(/\//g, "-");
+
         const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
         const link = document.createElement("a");
         const url = URL.createObjectURL(blob);
         link.setAttribute("href", url);
-        link.setAttribute("download", `maquinetas_${new Date().toISOString().split('T')[0]}.csv`);
+        link.setAttribute("download", `maquinetas${dateRange}_${currentDate}.csv`);
         link.style.visibility = "hidden";
         document.body.appendChild(link);
         link.click();
@@ -199,7 +237,7 @@ const MachinesPage = () => {
     }
 
     return (
-        <div className="space-y-6">
+        <div className="space-y-6" lang="pt-BR">
             {/* Header */}
             <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-3">
@@ -276,7 +314,7 @@ const MachinesPage = () => {
                     <Filter className="w-5 h-5 text-gray-600" />
                     <h3 className="text-lg font-semibold text-gray-900">Filtros</h3>
                 </div>
-                <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="mt-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                     <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">
                             Terminal
@@ -309,7 +347,50 @@ const MachinesPage = () => {
                             <option value="pending">Pendente</option>
                         </select>
                     </div>
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                            <Calendar className="w-4 h-4 inline mr-1" />
+                            Data Inicial
+                        </label>
+                        <DatePicker
+                            value={startDate}
+                            onChange={setStartDate}
+                            placeholder="Selecione a data inicial"
+                        />
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                            <Calendar className="w-4 h-4 inline mr-1" />
+                            Data Final
+                        </label>
+                        <DatePicker
+                            value={endDate}
+                            onChange={setEndDate}
+                            placeholder="Selecione a data final"
+                        />
+                    </div>
                 </div>
+                {(startDate || endDate) && (
+                    <div className="mt-4 flex items-center space-x-2">
+                        <button
+                            onClick={() => {
+                                setStartDate(undefined);
+                                setEndDate(undefined);
+                            }}
+                            className="px-3 py-1 text-sm bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
+                        >
+                            Limpar filtros de data
+                        </button>
+                        <span className="text-sm text-gray-600">
+                            {startDate && endDate
+                                ? `Filtrando de ${startDate.toLocaleDateString("pt-BR")} até ${endDate.toLocaleDateString("pt-BR")}`
+                                : startDate
+                                    ? `Filtrando a partir de ${startDate.toLocaleDateString("pt-BR")}`
+                                    : `Filtrando até ${endDate?.toLocaleDateString("pt-BR")}`
+                            }
+                        </span>
+                    </div>
+                )}
             </div>
 
             {/* Transactions Table */}
