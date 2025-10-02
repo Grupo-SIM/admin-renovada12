@@ -69,6 +69,8 @@ const WithdrawPage = () => {
     const [isWithdrawing, setIsWithdrawing] = useState(false);
     const [noDiaUtilModal, setNoDiaUtilModal] = useState(false);
     const [feriadoInfo, setFeriadoInfo] = useState<{ name: string } | null>(null);
+    const [hasPendingWithdrawal, setHasPendingWithdrawal] = useState(false);
+    const [pendingWithdrawal, setPendingWithdrawal] = useState<Withdrawal | null>(null);
 
     const fetchFinancialSummary = async () => {
         try {
@@ -115,8 +117,24 @@ const WithdrawPage = () => {
             const data: WithdrawalResponse = await response.json();
             setWithdrawals(data.withdrawals);
             setWithdrawalsPaginationMeta(data.meta);
+            
+            // Verificar se há saque pendente
+            checkPendingWithdrawal(data.withdrawals);
         } catch (error) {
             console.error("Erro ao carregar histórico de saques:", error);
+        }
+    };
+
+    const checkPendingWithdrawal = (withdrawals: Withdrawal[]) => {
+        // Procurar por saque pendente (apenas PENDING)
+        const pending = withdrawals.find(w => w.status === "PENDING");
+        
+        if (pending) {
+            setHasPendingWithdrawal(true);
+            setPendingWithdrawal(pending);
+        } else {
+            setHasPendingWithdrawal(false);
+            setPendingWithdrawal(null);
         }
     };
 
@@ -231,7 +249,10 @@ const WithdrawPage = () => {
                 }),
             });
 
-            if (!response.ok) throw new Error("Falha ao solicitar saque");
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.message || "Falha ao solicitar saque");
+            }
 
             toast.success(`PIX enviado com sucesso! ✅ Seu saque de ${formatCurrency(parseFloat(withdrawalAmount))} foi processado e está sendo transferido para sua conta.`);
 
@@ -239,8 +260,10 @@ const WithdrawPage = () => {
             setWithdrawalAmount("");
             setPixKey("");
             fetchFinancialSummary(); // Atualiza os dados após o saque
+            fetchWithdrawals(1); // Atualiza o histórico de saques
         } catch (error) {
-            toast.error("Não foi possível solicitar o saque.");
+            const errorMessage = error instanceof Error ? error.message : "Não foi possível solicitar o saque.";
+            toast.error(errorMessage);
         } finally {
             setIsWithdrawing(false);
         }
@@ -307,10 +330,15 @@ const WithdrawPage = () => {
                     </button>
                     <button
                         onClick={() => setIsModalOpen(true)}
-                        className="flex items-center space-x-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                        disabled={hasPendingWithdrawal}
+                        className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition-colors ${
+                            hasPendingWithdrawal
+                                ? "bg-gray-400 text-gray-200 cursor-not-allowed"
+                                : "bg-green-600 text-white hover:bg-green-700"
+                        }`}
                     >
                         <Wallet className="w-4 h-4" />
-                        <span>Solicitar Saque</span>
+                        <span>{hasPendingWithdrawal ? "Saque Pendente" : "Solicitar Saque"}</span>
                     </button>
                 </div>
             </div>
@@ -330,6 +358,28 @@ const WithdrawPage = () => {
                     </div>
                 </div>
             </div>
+
+            {/* Banner de Saque Pendente */}
+            {hasPendingWithdrawal && pendingWithdrawal && (
+                <div className="w-full bg-yellow-50 border border-yellow-200 rounded-md p-4">
+                    <div className="flex items-center">
+                        <div className="flex-shrink-0">
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-yellow-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                            </svg>
+                        </div>
+                        <div className="ml-3">
+                            <h3 className="text-sm font-medium text-yellow-800">
+                                Saque Pendente de Aprovação
+                            </h3>
+                            <div className="mt-1 text-sm text-yellow-700">
+                                <p>Você possui um saque de <strong>{formatCurrency(pendingWithdrawal.amount)}</strong> aguardando aprovação.</p>
+                                {/* <p className="mt-1">Status: <span className="font-semibold text-yellow-800">{pendingWithdrawal.status === "PENDING" ? "Aguardando Aprovação" : "Aprovado - Processando"}</span></p> */}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Abas */}
             <div className="border-b border-gray-200">
@@ -489,12 +539,17 @@ const WithdrawPage = () => {
                                                         ? "bg-green-100 text-green-800"
                                                         : withdrawal.status === "PENDING"
                                                             ? "bg-yellow-100 text-yellow-800"
-                                                            : withdrawal.status === "FAILED"
-                                                                ? "bg-red-100 text-red-800"
-                                                                : "bg-blue-100 text-blue-800"
+                                                            : withdrawal.status === "APPROVED"
+                                                                ? "bg-blue-100 text-blue-800"
+                                                                : withdrawal.status === "FAILED"
+                                                                    ? "bg-red-100 text-red-800"
+                                                                    : "bg-gray-100 text-gray-800"
                                                         }`}
                                                 >
-                                                    {withdrawal.status}
+                                                    {withdrawal.status === "COMPLETED" ? "Concluído" :
+                                                     withdrawal.status === "PENDING" ? "Aguardando Aprovação" :
+                                                     withdrawal.status === "APPROVED" ? "Aprovado - Processando" :
+                                                     withdrawal.status === "FAILED" ? "Falhou" : withdrawal.status}
                                                 </span>
                                             </td>
                                         </tr>
@@ -522,7 +577,15 @@ const WithdrawPage = () => {
                         <DialogTitle>Solicitar Saque</DialogTitle>
                     </DialogHeader>
                     <div className="grid gap-4 py-4">
-                        {(isWeekend(new Date()) || feriadoInfo) && (
+                        {hasPendingWithdrawal && (
+                            <div className="p-3 bg-yellow-50 border border-yellow-300 rounded-md">
+                                <p className="text-yellow-600 font-medium text-center">
+                                    Você já possui um saque pendente de aprovação. Aguarde a aprovação para solicitar um novo saque.
+                                </p>
+                            </div>
+                        )}
+                        
+                        {(isWeekend(new Date()) || feriadoInfo) && !hasPendingWithdrawal && (
                             <div className="p-3 bg-red-50 border border-red-300 rounded-md">
                                 <p className="text-red-600 font-medium text-center">
                                     {isWeekend(new Date())
@@ -544,7 +607,8 @@ const WithdrawPage = () => {
                                         type="text"
                                         value={withdrawalAmount}
                                         onChange={handleAmountChange}
-                                        className={`pl-8 ${parseFloat(withdrawalAmount) > (financialSummary?.availableBalance || 0) - 2
+                                        disabled={hasPendingWithdrawal}
+                                        className={`pl-8 ${hasPendingWithdrawal ? "bg-gray-100 cursor-not-allowed" : ""} ${parseFloat(withdrawalAmount) > (financialSummary?.availableBalance || 0) - 2
                                             ? "border-red-500 focus:ring-red-500"
                                             : ""
                                             }`}
@@ -566,6 +630,8 @@ const WithdrawPage = () => {
                                     type="text"
                                     value={pixKey}
                                     onChange={handlePixKeyChange}
+                                    disabled={hasPendingWithdrawal}
+                                    className={hasPendingWithdrawal ? "bg-gray-100 cursor-not-allowed" : ""}
                                     placeholder="Digite seu CPF ou CNPJ"
                                 />
                             </div>
@@ -592,19 +658,26 @@ const WithdrawPage = () => {
                         <Button
                             onClick={handleWithdrawalRequest}
                             disabled={
+                                hasPendingWithdrawal ||
                                 isWithdrawing ||
                                 !withdrawalAmount ||
                                 !pixKey ||
                                 parseFloat(withdrawalAmount) < 100 ||
                                 parseFloat(withdrawalAmount) > (financialSummary?.availableBalance || 0) - 2
                             }
-                            className="bg-green-600 hover:bg-green-700 text-white"
+                            className={`${
+                                hasPendingWithdrawal
+                                    ? "bg-gray-400 hover:bg-gray-400 cursor-not-allowed"
+                                    : "bg-green-600 hover:bg-green-700"
+                            } text-white`}
                         >
                             {isWithdrawing ? (
                                 <>
                                     <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
                                     Processando...
                                 </>
+                            ) : hasPendingWithdrawal ? (
+                                "Saque Pendente"
                             ) : (
                                 "Confirmar"
                             )}
