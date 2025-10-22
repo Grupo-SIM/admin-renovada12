@@ -145,14 +145,28 @@ const VideoModal: React.FC<VideoModalProps> = ({
 
       if (mode === "create") {
         await videoCategoryService.createVideo(videoData);
+        toast({
+          title: "Sucesso",
+          description: "Vídeo criado com sucesso!",
+        });
+        onSuccess?.();
+        setOpen(false);
       } else if (mode === "delete" && video?.id) {
         await videoCategoryService.deleteVideo(video.id);
+        toast({
+          title: "Sucesso",
+          description: "Vídeo deletado com sucesso!",
+        });
+        onSuccess?.();
+        setOpen(false);
       }
-
-      onSuccess?.();
-      setOpen(false);
     } catch (error) {
       console.error("Error:", error);
+      toast({
+        title: "Erro",
+        description: "Falha ao processar a solicitação",
+        variant: "destructive",
+      });
     } finally {
       setLoading(false);
     }

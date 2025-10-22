@@ -5,6 +5,8 @@ import { Plus, Trash2 } from "lucide-react";
 import { Card, Badge, Button, CardContent } from "@/components/ui/global";
 import { videoCategoryService, VideoCategory, Video0 } from "@/services/category";
 import { useToast } from "@/hooks/use-toast";
+import { useConfirmation } from "@/hooks/use-confirmation";
+import { ConfirmationDialog } from "@/components/ui/confirmation-dialog";
 import VideoModal from "./modal";
 
 const VideoCategories = () => {
@@ -13,6 +15,7 @@ const VideoCategories = () => {
   const [videos, setVideos] = useState<Video0[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
+  const { confirm, isOpen, options, onConfirm, onCancel } = useConfirmation();
 
   const fetchCategories = async () => {
     setIsLoading(true);
@@ -55,42 +58,70 @@ const VideoCategories = () => {
   }, []);
 
   const handleDeleteCategory = async (id: string) => {
-    if (confirm("Are you sure you want to delete this category?")) {
-      try {
-        await videoCategoryService.deleteCategory(id);
-        toast({
-          title: "Success",
-          description: "Category deleted successfully!",
-        });
-        fetchCategories();
-      } catch (error) {
-        toast({
-          title: "Error",
-          description: "Failed to delete category",
-          variant: "destructive",
-        });
+    confirm(
+      {
+        title: "Excluir Categoria",
+        description: "Tem certeza que deseja excluir esta categoria? Esta ação não pode ser desfeita.",
+        confirmText: "Excluir",
+        cancelText: "Cancelar",
+        variant: "destructive",
+      },
+      async () => {
+        try {
+          await videoCategoryService.deleteCategory(id);
+          toast({
+            title: "Sucesso",
+            description: "Categoria excluída com sucesso!",
+          });
+          fetchCategories();
+        } catch (error) {
+          toast({
+            title: "Erro",
+            description: "Falha ao excluir a categoria",
+            variant: "destructive",
+          });
+        }
       }
-    }
+    );
   };
 
   const handleDeleteVideo = async (id: string) => {
-    if (confirm("Are you sure you want to delete this video?")) {
-      try {
-        await videoCategoryService.deleteVideo(id);
-        toast({
-          title: "Success",
-          description: "Video deleted successfully!",
-        });
-        if (selectedCategory) {
-          fetchVideosForCategory(selectedCategory.id);
+    confirm(
+      {
+        title: "Excluir Vídeo",
+        description: "Tem certeza que deseja excluir este vídeo? Esta ação não pode ser desfeita.",
+        confirmText: "Excluir",
+        cancelText: "Cancelar",
+        variant: "destructive",
+      },
+      async () => {
+        try {
+          await videoCategoryService.deleteVideo(id);
+          toast({
+            title: "Sucesso",
+            description: "Vídeo excluído com sucesso!",
+          });
+          if (selectedCategory) {
+            fetchVideosForCategory(selectedCategory.id);
+          }
+        } catch (error) {
+          toast({
+            title: "Erro",
+            description: "Falha ao excluir o vídeo",
+            variant: "destructive",
+          });
         }
-      } catch (error) {
-        toast({
-          title: "Error",
-          description: "Failed to delete video",
-          variant: "destructive",
-        });
       }
+    );
+  };
+
+  const handleVideoCreated = () => {
+    // Atualiza a lista de vídeos da categoria selecionada
+    if (selectedCategory?.id) {
+      fetchVideosForCategory(selectedCategory.id);
+    } else {
+      // Se não há categoria selecionada, recarrega as categorias
+      fetchCategories();
     }
   };
 
@@ -147,7 +178,7 @@ const VideoCategories = () => {
             </Button>
           ))}
         </div>
-        <VideoModal mode="create" onSuccess={() => fetchVideosForCategory(selectedCategory?.id as string)} />
+        <VideoModal mode="create" onSuccess={handleVideoCreated} />
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 lg:gap-6">
@@ -186,6 +217,20 @@ const VideoCategories = () => {
         <div className="flex justify-center items-center h-40">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" />
         </div>
+      )}
+
+      {options && (
+        <ConfirmationDialog
+          open={isOpen}
+          onOpenChange={onCancel}
+          title={options.title}
+          description={options.description}
+          confirmText={options.confirmText}
+          cancelText={options.cancelText}
+          variant={options.variant}
+          onConfirm={onConfirm}
+          onCancel={onCancel}
+        />
       )}
     </>
   );

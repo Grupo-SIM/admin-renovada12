@@ -52,9 +52,8 @@ export const useToast = () => {
   const [toasts, setToasts] = useState<Array<ToastProps & { id: string; open: boolean }>>([]);
 
   const toast = useCallback(({ title, description, variant = 'default' }: ToastProps) => {
-  //  const id = Math.random().toString(36).substr(2, 9);
- //   setToasts((currentToasts) => [...currentToasts, { id, title, description, variant, open: true }]);
- alert(title);
+    const id = Math.random().toString(36).substr(2, 9);
+    setToasts((currentToasts) => [...currentToasts, { id, title, description, variant, open: true }]);
   }, []);
 
   const onOpenChange = useCallback((id: string, open: boolean) => {
