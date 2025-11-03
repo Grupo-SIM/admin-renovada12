@@ -52,6 +52,28 @@ const MachinesPage = () => {
     const [endDate, setEndDate] = useState<Date | undefined>(undefined);
 
 
+    const syncMachinesTransactions = async () => {
+        try {
+            const response = await fetch(
+                "https://api-dom.jbmidia.com/payments/admin/sync-machines-transactions",
+                {
+                    method: "POST",
+                    headers: {
+                        "x-access-token": "4a29df01-a980-45e3-b3c7-1a8b8eb7850f",
+                        "Content-Type": "application/json",
+                    },
+                }
+            );
+
+            if (!response.ok) {
+                throw new Error("Erro ao sincronizar transações das maquinetas");
+            }
+        } catch (err) {
+            console.error("Erro na sincronização:", err);
+            // Não bloqueia a atualização dos dados mesmo se a sincronização falhar
+        }
+    };
+
     const fetchData = async () => {
         try {
             setLoading(true);
@@ -78,6 +100,12 @@ const MachinesPage = () => {
         } finally {
             setLoading(false);
         }
+    };
+
+    const handleUpdate = async () => {
+        // Primeiro sincroniza as transações, depois busca os dados atualizados
+        await syncMachinesTransactions();
+        await fetchData();
     };
 
     useEffect(() => {
@@ -249,7 +277,7 @@ const MachinesPage = () => {
                 </div>
                 <div className="flex space-x-2">
                     <button
-                        onClick={fetchData}
+                        onClick={handleUpdate}
                         className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
                     >
                         <RefreshCw className="w-4 h-4" />
