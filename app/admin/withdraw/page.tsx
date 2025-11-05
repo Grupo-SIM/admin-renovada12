@@ -15,6 +15,7 @@ import { toast } from 'react-toastify';
 
 interface FinancialSummary {
     availableBalance: number;
+    netBalance: number;
     pendingWithdraws: number;
     lockedBalance: number;
     wallet: {
@@ -452,7 +453,7 @@ const WithdrawPage = () => {
                                     <div className="ml-4">
                                         <p className="text-sm font-medium text-gray-600">Saldo disponível</p>
                                         <p className="text-2xl font-bold text-gray-900">
-                                            {formatCurrency(financialSummary.availableBalance)}
+                                            {formatCurrency(financialSummary.netBalance)}
                                         </p>
                                     </div>
                                 </div>
@@ -683,7 +684,7 @@ const WithdrawPage = () => {
                                     />
                                 </div>
                                 <p className="text-sm text-gray-500 mt-1">
-                                    Saldo disponível: {formatCurrency(financialSummary?.availableBalance || 0)}
+                                    Saldo disponível: {formatCurrency(financialSummary?.netBalance || 0)}
                                 </p>
                             </div>
                         </div>
