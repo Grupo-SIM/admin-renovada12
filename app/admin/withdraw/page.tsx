@@ -1,6 +1,7 @@
 "use client";
 import React, { useEffect, useState } from "react";
-import { Wallet, RefreshCw, DollarSign, ArrowUpRight, ArrowDownLeft, History, FileText, Download, Eye } from "lucide-react";
+import { Wallet, RefreshCw, DollarSign, ArrowUpRight, ArrowDownLeft, History, FileText, Download, Eye, Info } from "lucide-react";
+import { Tooltip } from "@/components/ui/tooltip";
 import { Button } from "@/components/ui/global";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/global";
@@ -31,10 +32,11 @@ interface Withdrawal {
     id: string;
     userId: string;
     amount: number;
-    status: "PENDING" | "COMPLETED" | "FAILED" | "APPROVED";
+    status: "PENDING" | "COMPLETED" | "FAILED" | "APPROVED" | "REJECTED";
     pixKey: string;
     receiptImage?: string;
     fee?: string;
+    rejectionReason?: string | null;
     createdAt: string;
     updatedAt: string;
     user: {
@@ -564,24 +566,34 @@ const WithdrawPage = () => {
                                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                                                 {withdrawal.pixKey}
                                             </td>
-                                            <td className="px-6 py-4 whitespace-nowrap">
-                                                <span
-                                                    className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${withdrawal.status === "COMPLETED"
-                                                        ? "bg-green-100 text-green-800"
-                                                        : withdrawal.status === "PENDING"
-                                                            ? "bg-yellow-100 text-yellow-800"
-                                                            : withdrawal.status === "APPROVED"
-                                                                ? "bg-blue-100 text-blue-800"
-                                                                : withdrawal.status === "FAILED"
-                                                                    ? "bg-red-100 text-red-800"
-                                                                    : "bg-gray-100 text-gray-800"
-                                                        }`}
-                                                >
-                                                    {withdrawal.status === "COMPLETED" ? "Concluído" :
-                                                        withdrawal.status === "PENDING" ? "Aguardando Aprovação" :
-                                                            withdrawal.status === "APPROVED" ? "Aprovado - Processando" :
-                                                                withdrawal.status === "FAILED" ? "Falhou" : withdrawal.status}
-                                                </span>
+                                            <td className="px-6 py-4 whitespace-nowrap overflow-visible">
+                                                <div className="flex items-center gap-2 relative">
+                                                    <span
+                                                        className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${withdrawal.status === "COMPLETED"
+                                                            ? "bg-green-100 text-green-800"
+                                                            : withdrawal.status === "PENDING"
+                                                                ? "bg-yellow-100 text-yellow-800"
+                                                                : withdrawal.status === "APPROVED"
+                                                                    ? "bg-blue-100 text-blue-800"
+                                                                    : withdrawal.status === "FAILED"
+                                                                        ? "bg-red-100 text-red-800"
+                                                                        : withdrawal.status === "REJECTED"
+                                                                            ? "bg-red-100 text-red-800"
+                                                                            : "bg-gray-100 text-gray-800"
+                                                            }`}
+                                                    >
+                                                        {withdrawal.status === "COMPLETED" ? "Concluído" :
+                                                            withdrawal.status === "PENDING" ? "Aguardando Aprovação" :
+                                                                withdrawal.status === "APPROVED" ? "Aprovado - Processando" :
+                                                                    withdrawal.status === "FAILED" ? "Falhou" :
+                                                                        withdrawal.status === "REJECTED" ? "Recusado" : withdrawal.status}
+                                                    </span>
+                                                    {withdrawal.status === "REJECTED" && withdrawal.rejectionReason && (
+                                                        <Tooltip content={withdrawal.rejectionReason}>
+                                                            <Info className="w-4 h-4 text-red-600 cursor-help" />
+                                                        </Tooltip>
+                                                    )}
+                                                </div>
                                             </td>
                                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                                                 {withdrawal.receiptImage ? (
