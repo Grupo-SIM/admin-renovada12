@@ -57,6 +57,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/ceckbox";
+import { ConfirmationDialog } from "@/components/ui/confirmation-dialog";
 
 
 import { useForm } from "react-hook-form";
@@ -397,6 +398,8 @@ const AdminDashboard = () => {
   );
   const [viewModalOpen, setViewModalOpen] = useState(false);
   const [createModalOpen, setCreateModalOpen] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const openCreateModal = () => {
     setCreateModalOpen(true);
   };
@@ -415,6 +418,7 @@ const AdminDashboard = () => {
       setStatistics(statsData);
       setPrayerRequests(requestsData.items);
       setTotalRequests(requestsData.total);
+      setSelectedIds(new Set()); // Limpa seleção ao recarregar
     } catch (error) {
       toast({
         title: "Erro",
@@ -461,6 +465,56 @@ const AdminDashboard = () => {
       });
     }
   };
+
+  const handleSelectAll = (checked: boolean | "indeterminate") => {
+    if (checked === true) {
+      setSelectedIds(new Set(prayerRequests.map((req) => req.id)));
+    } else {
+      setSelectedIds(new Set());
+    }
+  };
+
+  const handleSelectOne = (id: string, checked: boolean | "indeterminate") => {
+    const newSelectedIds = new Set(selectedIds);
+    if (checked === true) {
+      newSelectedIds.add(id);
+    } else {
+      newSelectedIds.delete(id);
+    }
+    setSelectedIds(newSelectedIds);
+  };
+
+  const handleDeleteSelectedClick = () => {
+    if (selectedIds.size === 0) return;
+    setDeleteConfirmOpen(true);
+  };
+
+  const handleDeleteSelected = async () => {
+    const count = selectedIds.size;
+
+    try {
+      const deletePromises = Array.from(selectedIds).map((id) =>
+        prayerService.deletePrayerRequest(id)
+      );
+      await Promise.all(deletePromises);
+      toast({
+        title: "Sucesso",
+        description: `${count} pedido(s) de oração excluído(s) com sucesso!`,
+      });
+      setSelectedIds(new Set());
+      fetchData();
+    } catch (error) {
+      toast({
+        title: "Erro",
+        description: "Não foi possível excluir os pedidos selecionados.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const isAllSelected =
+    prayerRequests.length > 0 &&
+    selectedIds.size === prayerRequests.length;
 
   const openViewModal = (request: PrayerRequest) => {
     setSelectedRequest(request);
@@ -553,14 +607,27 @@ const AdminDashboard = () => {
     <Card>
       <CardHeader className="flex flex-col sm:flex-row items-start sm:items-center justify-between space-y-2 sm:space-y-0">
         <CardTitle>Pedidos de Oração</CardTitle>
-        <Button
-          size="sm"
-          onClick={() => setCreateModalOpen(true)}
-          className="bg-blue-600 hover:bg-blue-700 w-full sm:w-auto"
-        >
-          <Plus className="w-4 h-4 mr-2" />
-          Novo Pedido
-        </Button>
+        <div className="flex gap-2 w-full sm:w-auto">
+          {selectedIds.size > 0 && (
+            <Button
+              size="sm"
+              variant="destructive"
+              onClick={handleDeleteSelectedClick}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              <Trash2 className="w-4 h-4 mr-2" />
+              Excluir Selecionados ({selectedIds.size})
+            </Button>
+          )}
+          <Button
+            size="sm"
+            onClick={() => setCreateModalOpen(true)}
+            className="bg-blue-600 hover:bg-blue-700 w-full sm:w-auto"
+          >
+            <Plus className="w-4 h-4 mr-2" />
+            Novo Pedido
+          </Button>
+        </div>
       </CardHeader>
       <CardContent>
         <div className="overflow-x-auto -mx-4 sm:mx-0">
@@ -568,6 +635,12 @@ const AdminDashboard = () => {
             <table className="min-w-full">
               <thead className="bg-gray-50">
                 <tr>
+                  <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase w-12">
+                    <Checkbox
+                      checked={isAllSelected}
+                      onCheckedChange={handleSelectAll}
+                    />
+                  </th>
                   <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                     Nome
                   </th>
@@ -588,6 +661,14 @@ const AdminDashboard = () => {
               <tbody className="divide-y divide-gray-200">
                 {prayerRequests.map((request) => (
                   <tr key={request.id}>
+                    <td className="px-4 lg:px-6 py-4 whitespace-nowrap">
+                      <Checkbox
+                        checked={selectedIds.has(request.id)}
+                        onCheckedChange={(checked) =>
+                          handleSelectOne(request.id, checked)
+                        }
+                      />
+                    </td>
                     <td className="px-4 lg:px-6 py-4 whitespace-nowrap">
                       {request.name}
                     </td>
@@ -653,6 +734,16 @@ const AdminDashboard = () => {
         open={createModalOpen}
         onClose={closeCreateModal}
         onSuccess={fetchData}
+      />
+      <ConfirmationDialog
+        open={deleteConfirmOpen}
+        onOpenChange={setDeleteConfirmOpen}
+        title="Confirmar Exclusão"
+        description={`Tem certeza que deseja excluir ${selectedIds.size} pedido(s) de oração selecionado(s)? Esta ação não pode ser desfeita.`}
+        confirmText="Excluir"
+        cancelText="Cancelar"
+        variant="destructive"
+        onConfirm={handleDeleteSelected}
       />
     </>
   );
