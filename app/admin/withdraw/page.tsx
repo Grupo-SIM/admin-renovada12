@@ -353,7 +353,10 @@ const WithdrawPage = () => {
                 </div>
                 <div className="flex space-x-2">
                     <button
-                        onClick={fetchFinancialSummary}
+                        onClick={() => {
+                            fetchFinancialSummary();
+                            fetchWithdrawals(withdrawalsPaginationMeta.currentPage);
+                        }}
                         className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
                     >
                         <RefreshCw className="w-4 h-4" />
