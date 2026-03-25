@@ -1,3 +1,5 @@
+"use client";
+
 import React, { useState, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/global";
 import { Button } from "@/components/ui/global";
@@ -13,12 +15,18 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import {
+  DragDropContext,
+  Droppable,
+  Draggable,
+  DropResult,
+} from "@hello-pangea/dnd";
+import {
   Plus,
-  BookOpen,
   Pencil,
   Trash2,
   FolderPlus,
   Image,
+  GripVertical,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { imageService } from "@/services/image";
@@ -88,11 +96,9 @@ const CategoryModal = ({
     if (!file) return;
 
     setSelectedFile(file);
-    // Create a preview URL for the selected image
     const objectUrl = URL.createObjectURL(file);
     setPreviewUrl(objectUrl);
 
-    // Clean up the object URL when component unmounts or when a new file is selected
     return () => URL.revokeObjectURL(objectUrl);
   };
 
@@ -113,7 +119,6 @@ const CategoryModal = ({
     try {
       let thumbnailUrl = previewUrl;
 
-      // Only upload if there's a new file selected
       if (selectedFile) {
         const formData = new FormData();
         formData.append("file", selectedFile);
@@ -122,7 +127,6 @@ const CategoryModal = ({
         thumbnailUrl = "https://api-renovada.jbmidia.com" + result.url;
       }
 
-      // Submit the form data including the thumbnail URL
       await onSubmit({
         ...(initialData && { id: initialData.id }),
         name,
@@ -130,7 +134,6 @@ const CategoryModal = ({
         thumbnail: thumbnailUrl,
       });
 
-      // Reset form
       if (!initialData) {
         setName("");
         setDescription("");
@@ -139,7 +142,7 @@ const CategoryModal = ({
       }
 
       onClose();
-    } catch (error) {
+    } catch {
       toast({
         title: "Erro",
         description: "Erro ao salvar categoria.",
@@ -329,6 +332,7 @@ const CategorizedStudiesPage = () => {
   const [studies, setStudies] = useState<Study[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [isSavingOrder, setIsSavingOrder] = useState(false);
   const [categoryModal, setCategoryModal] = useState<{
     isOpen: boolean;
     mode: "create" | "edit";
@@ -357,7 +361,7 @@ const CategorizedStudiesPage = () => {
       if (data.length > 0 && !selectedCategory) {
         setSelectedCategory(data[0].id);
       }
-    } catch (error) {
+    } catch {
       toast({
         title: "Erro",
         description: "Não foi possível carregar as categorias.",
@@ -374,7 +378,7 @@ const CategorizedStudiesPage = () => {
       );
       const data = await response.json();
       setStudies(data);
-    } catch (error) {
+    } catch {
       toast({
         title: "Erro",
         description: "Não foi possível carregar os estudos.",
@@ -395,7 +399,42 @@ const CategorizedStudiesPage = () => {
     }
   }, [selectedCategory]);
 
-  // Category CRUD operations
+  const handleDragEnd = async (result: DropResult) => {
+    if (!result.destination) return;
+    if (result.destination.index === result.source.index) return;
+
+    const reordered = Array.from(studies);
+    const [moved] = reordered.splice(result.source.index, 1);
+    reordered.splice(result.destination.index, 0, moved);
+
+    setStudies(reordered);
+
+    setIsSavingOrder(true);
+    try {
+      const response = await fetch(
+        `${API_URL}/categorized-studies/categories/${selectedCategory}/studies/reorder`,
+        {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ orderedIds: reordered.map((s) => s.id) }),
+        }
+      );
+
+      if (!response.ok) throw new Error("Failed to reorder");
+
+      toast({ title: "Sucesso", description: "Ordem salva com sucesso!" });
+    } catch {
+      toast({
+        title: "Erro",
+        description: "Não foi possível salvar a ordem.",
+        variant: "destructive",
+      });
+      if (selectedCategory) fetchStudies(selectedCategory);
+    } finally {
+      setIsSavingOrder(false);
+    }
+  };
+
   const handleCreateCategory = async (categoryData: Partial<Category>) => {
     try {
       const response = await fetch(
@@ -411,7 +450,7 @@ const CategorizedStudiesPage = () => {
 
       toast({ title: "Sucesso", description: "Categoria criada com sucesso!" });
       fetchCategories();
-    } catch (error) {
+    } catch {
       toast({
         title: "Erro",
         description: "Não foi possível criar a categoria.",
@@ -438,7 +477,7 @@ const CategorizedStudiesPage = () => {
         description: "Categoria atualizada com sucesso!",
       });
       fetchCategories();
-    } catch (error) {
+    } catch {
       toast({
         title: "Erro",
         description: "Não foi possível atualizar a categoria.",
@@ -452,9 +491,7 @@ const CategorizedStudiesPage = () => {
       try {
         const response = await fetch(
           `${API_URL}/categorized-studies/categories/${id}`,
-          {
-            method: "DELETE",
-          }
+          { method: "DELETE" }
         );
 
         if (!response.ok) throw new Error("Failed to delete category");
@@ -467,7 +504,7 @@ const CategorizedStudiesPage = () => {
         if (selectedCategory === id) {
           setSelectedCategory(null);
         }
-      } catch (error) {
+      } catch {
         toast({
           title: "Erro",
           description: "Não foi possível excluir a categoria.",
@@ -477,7 +514,6 @@ const CategorizedStudiesPage = () => {
     }
   };
 
-  // Study CRUD operations
   const handleCreateStudy = async (studyData: Partial<Study>) => {
     try {
       const response = await fetch(`${API_URL}/categorized-studies/studies`, {
@@ -492,7 +528,7 @@ const CategorizedStudiesPage = () => {
       if (selectedCategory) {
         fetchStudies(selectedCategory);
       }
-    } catch (error) {
+    } catch {
       toast({
         title: "Erro",
         description: "Não foi possível criar o estudo.",
@@ -521,7 +557,7 @@ const CategorizedStudiesPage = () => {
       if (selectedCategory) {
         fetchStudies(selectedCategory);
       }
-    } catch (error) {
+    } catch {
       toast({
         title: "Erro",
         description: "Não foi possível atualizar o estudo.",
@@ -535,9 +571,7 @@ const CategorizedStudiesPage = () => {
       try {
         const response = await fetch(
           `${API_URL}/categorized-studies/studies/${id}`,
-          {
-            method: "DELETE",
-          }
+          { method: "DELETE" }
         );
 
         if (!response.ok) throw new Error("Failed to delete study");
@@ -549,7 +583,7 @@ const CategorizedStudiesPage = () => {
         if (selectedCategory) {
           fetchStudies(selectedCategory);
         }
-      } catch (error) {
+      } catch {
         toast({
           title: "Erro",
           description: "Não foi possível excluir o estudo.",
@@ -577,7 +611,6 @@ const CategorizedStudiesPage = () => {
 
   return (
     <div className="p-6">
-      {/* Modals */}
       <CategoryModal
         isOpen={categoryModal.isOpen}
         onClose={() => setCategoryModal({ isOpen: false, mode: "create" })}
@@ -594,7 +627,7 @@ const CategorizedStudiesPage = () => {
         mode={studyModal.mode}
       />
 
-      {/* Categories Section */}
+      {/* Categorias */}
       <div className="mb-8">
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-2xl font-bold">Categorias</h2>
@@ -662,20 +695,33 @@ const CategorizedStudiesPage = () => {
         </div>
       </div>
 
-      {/* Studies Section */}
+      {/* Estudos com drag-and-drop */}
       {selectedCategory && (
         <div>
           <div className="flex justify-between items-center mb-6">
-            <h2 className="text-2xl font-bold">
-              Estudos -{" "}
-              {categories.find((c) => c.id === selectedCategory)?.name}
-            </h2>
-            <Button
-              onClick={() => setStudyModal({ isOpen: true, mode: "create" })}
-            >
-              <Plus className="w-4 h-4 mr-2" />
-              Novo Estudo
-            </Button>
+            <div className="flex items-center gap-3">
+              <h2 className="text-2xl font-bold">
+                Estudos —{" "}
+                {categories.find((c) => c.id === selectedCategory)?.name}
+              </h2>
+              {isSavingOrder && (
+                <span className="text-sm text-gray-400 flex items-center gap-1">
+                  <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-gray-400" />
+                  Salvando ordem...
+                </span>
+              )}
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-gray-400">
+                Arraste os cards para reordenar
+              </span>
+              <Button
+                onClick={() => setStudyModal({ isOpen: true, mode: "create" })}
+              >
+                <Plus className="w-4 h-4 mr-2" />
+                Novo Estudo
+              </Button>
+            </div>
           </div>
 
           {isLoading ? (
@@ -683,55 +729,102 @@ const CategorizedStudiesPage = () => {
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {studies.map((study) => (
-                <Card
-                  key={study.id}
-                  className="hover:shadow-lg transition-shadow"
-                >
-                  <CardContent className="p-6">
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <h3 className="text-lg font-semibold mb-2">
-                          {study.title}
-                        </h3>
-                        <p className="text-sm text-gray-600 mb-4">
-                          Última atualização: {dayjs(study.updatedAt).format(
-                            "DD/MM/YYYY HH:mm"
-                          )}
-                        </p>
-                        <p className="text-gray-700 line-clamp-3 whitespace-pre-wrap">
-                          {study.content}
-                        </p>
-                      </div>
-                      <div className="flex flex-col space-y-2 ml-4">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() =>
-                            setStudyModal({
-                              isOpen: true,
-                              mode: "edit",
-                              study,
-                            })
-                          }
-                        >
-                          <Pencil className="w-4 h-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleDeleteStudy(study.id)}
-                          className="text-red-600 hover:text-red-700"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
+            <DragDropContext onDragEnd={handleDragEnd}>
+              <Droppable droppableId="studies" direction="vertical">
+                {(provided) => (
+                  <div
+                    {...provided.droppableProps}
+                    ref={provided.innerRef}
+                    className="flex flex-col gap-3"
+                  >
+                    {studies.map((study, index) => (
+                      <Draggable
+                        key={study.id}
+                        draggableId={study.id}
+                        index={index}
+                      >
+                        {(provided, snapshot) => (
+                          <div
+                            ref={provided.innerRef}
+                            {...provided.draggableProps}
+                            {...provided.dragHandleProps}
+                            style={{
+                              ...provided.draggableProps.style,
+                              cursor: snapshot.isDragging ? "grabbing" : "grab",
+                            }}
+                          >
+                            <Card
+                              className={`transition-shadow select-none ${
+                                snapshot.isDragging
+                                  ? "shadow-2xl opacity-90 ring-2 ring-primary"
+                                  : "hover:shadow-md"
+                              }`}
+                            >
+                              <CardContent className="p-4">
+                                <div className="flex items-center gap-4">
+                                  <GripVertical className="w-5 h-5 text-gray-400 flex-shrink-0" />
+                                  <div className="flex-1 min-w-0">
+                                    <div className="flex items-center gap-2 mb-1">
+                                      <span className="text-xs font-medium text-primary bg-primary/10 rounded px-2 py-0.5">
+                                        #{index + 1}
+                                      </span>
+                                      <h3 className="text-base font-semibold truncate">
+                                        {study.title}
+                                      </h3>
+                                    </div>
+                                    <p className="text-xs text-gray-500 mb-1">
+                                      Última atualização:{" "}
+                                      {dayjs(study.updatedAt).format(
+                                        "DD/MM/YYYY HH:mm"
+                                      )}
+                                    </p>
+                                    <p className="text-sm text-gray-600 line-clamp-2 whitespace-pre-wrap">
+                                      {study.content}
+                                    </p>
+                                  </div>
+                                  <div
+                                    className="flex items-center gap-1 flex-shrink-0"
+                                    onMouseDown={(e) => e.stopPropagation()}
+                                    onPointerDown={(e) => e.stopPropagation()}
+                                  >
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setStudyModal({
+                                          isOpen: true,
+                                          mode: "edit",
+                                          study,
+                                        });
+                                      }}
+                                    >
+                                      <Pencil className="w-4 h-4" />
+                                    </Button>
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleDeleteStudy(study.id);
+                                      }}
+                                      className="text-red-600 hover:text-red-700"
+                                    >
+                                      <Trash2 className="w-4 h-4" />
+                                    </Button>
+                                  </div>
+                                </div>
+                              </CardContent>
+                            </Card>
+                          </div>
+                        )}
+                      </Draggable>
+                    ))}
+                    {provided.placeholder}
+                  </div>
+                )}
+              </Droppable>
+            </DragDropContext>
           )}
         </div>
       )}
