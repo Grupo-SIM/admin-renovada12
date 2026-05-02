@@ -42,6 +42,7 @@ import {
 } from "lucide-react";
 import { toast } from 'react-toastify';
 import { jsonToExcel } from "@/services/excel";
+import { MACHINE_API_URL, INTERNAL_API_URL, RENOVADA_USER_ID } from "@/constants/api";
 
 interface Transaction {
   id: string;
@@ -80,6 +81,11 @@ interface TransactionResponse {
   transactions: Transaction[];
   meta: PaginationMeta;
 }
+
+const stripInternalTags = (description?: string | null) => {
+  if (!description) return "";
+  return description.replace(/\[TENANT:[^\]]+\]/gi, "").replace(/\[CPF_DONO:[^\]]+\]/gi, "").trim();
+};
 
 const formatCPFCNPJ = (value: string) => {
   const numbersOnly = value.replace(/\D/g, "");
@@ -160,7 +166,6 @@ const TransactionsPage = () => {
     totalPages: 1,
   });
   const [isLoading, setIsLoading] = useState(false);
-  const API_URL = "https://api-dom.jbmidia.com";
 
   const [walletPerDescription, setWalletPerDescription] = useState<{
     [key: string]: number;
@@ -175,29 +180,21 @@ const TransactionsPage = () => {
   const handleExportExcel = async () => {
     setIsExporting(true);
     try {
-      let url = `${API_URL}/payments/all-transactions-excel?`;
+      let url = `${INTERNAL_API_URL}/renovada/finance/transactions?userId=${RENOVADA_USER_ID}&limit=5000`;
 
-      if (startDate) {
-        url += `&startDate=${startDate}`;
-      }
-      if (endDate) {
-        url += `&endDate=${endDate}`;
-      }
-      if (statusFilter && statusFilter !== "ALL") {
-        url += `&status=${statusFilter}`;
-      }
-      if (description && description !== "ALL") {
-        url += `&description=${description}`;
-      }
+      if (startDate) url += `&startDate=${startDate}`;
+      if (endDate) url += `&endDate=${endDate}`;
+      if (statusFilter && statusFilter !== "ALL") url += `&status=${statusFilter}`;
+      if (description && description !== "ALL") url += `&description=${description}`;
 
       const response = await fetch(url, {
         headers: {
           accept: "*/*",
-          "x-access-token": "4a29df01-a980-45e3-b3c7-1a8b8eb7850f",
         },
       });
 
       if (!response.ok) throw new Error("Falha ao exportar dados");
+      const exportData = await response.json();
       // Define columns for Excel export
       const columns = [
         { header: "Nome", key: "nome", width: 35 },
@@ -210,8 +207,7 @@ const TransactionsPage = () => {
         { header: "Método de Pagamento", key: "método de pagamento", width: 15 },
         { header: "Valor Recebido", key: "valor", width: 15 },
       ];
-      const transactions0 = await response.json();
-      console.log(transactions0);
+      const transactions0 = exportData.transactions ?? exportData;
       // Format data before export
       const formattedTransactions = transactions0.map((transaction: any) => ({
         ...transaction,
@@ -243,13 +239,15 @@ const TransactionsPage = () => {
 
   const fetchFinancialSummary = async () => {
     try {
-      const response = await fetch(`${API_URL}/payments/summary`, {
-        headers: {
-          accept: "*/*",
-          "x-access-token": "4a29df01-a980-45e3-b3c7-1a8b8eb7850f",
-          "Content-Type": "application/json",
-        },
-      });
+      const response = await fetch(
+        `${INTERNAL_API_URL}/renovada/finance/summary?userId=${RENOVADA_USER_ID}`,
+        {
+          headers: {
+            accept: "*/*",
+              "Content-Type": "application/json",
+          },
+        }
+      );
       const data = await response.json();
       setFinancialSummary(data);
     } catch (error) {
@@ -259,21 +257,13 @@ const TransactionsPage = () => {
 
   const fetchMachinesBalance = async () => {
     try {
-      const response = await fetch("https://api-dom.jbmidia.com/payments/dom/specific-machines-transactions", {
-        headers: {
-          "x-access-token": "4a29df01-a980-45e3-b3c7-1a8b8eb7850f",
-          "Content-Type": "application/json",
-        },
+      const response = await fetch(`${MACHINE_API_URL}/admin/renovada/machines?limit=100`, {
+        headers: { "Content-Type": "application/json" },
       });
 
       if (response.ok) {
         const data = await response.json();
         const totalMachinesBalance = data.transactions.reduce((sum: number, transaction: any) => sum + transaction.profit_minus_tax, 0);
-        console.log('Saldo das Maquinetas calculado:', {
-          totalTransacoes: data.transactions.length,
-          totalMachinesBalance: totalMachinesBalance,
-          transacoes: data.transactions.map((t: any) => ({ id: t.id, profit_minus_tax: t.profit_minus_tax }))
-        });
         setMachinesBalance(totalMachinesBalance);
       }
     } catch (error) {
@@ -287,7 +277,7 @@ const TransactionsPage = () => {
   const fetchTransactions = async (page = 1) => {
     setIsLoading(true);
     try {
-      let url = `${API_URL}/payments/history?page=${page}&limit=${paginationMeta.itemsPerPage}`;
+      let url = `${INTERNAL_API_URL}/renovada/finance/transactions?userId=${RENOVADA_USER_ID}&page=${page}&limit=${paginationMeta.itemsPerPage}`;
 
       if (startDate) {
         url += `&startDate=${startDate}`;
@@ -305,7 +295,6 @@ const TransactionsPage = () => {
       const response = await fetch(url, {
         headers: {
           accept: "*/*",
-          "x-access-token": "4a29df01-a980-45e3-b3c7-1a8b8eb7850f",
           "Content-Type": "application/json",
         },
       });

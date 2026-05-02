@@ -2,6 +2,7 @@
 import React, { useEffect, useState } from "react";
 import { CreditCard, RefreshCw, Filter, Download, Calendar } from "lucide-react";
 import { DatePicker } from "@/components/ui/date-picker";
+import { MACHINE_API_URL } from "@/constants/api";
 
 interface Transaction {
     id: string;
@@ -35,11 +36,7 @@ interface Transaction {
 
 interface ApiResponse {
     transactions: Transaction[];
-    total: number;
-    page: number;
-    limit: number;
-    totalPages: number;
-    machines: string[];
+    meta: { page: number; limit: number; total: number; totalPages: number };
 }
 
 const MachinesPage = () => {
@@ -54,16 +51,10 @@ const MachinesPage = () => {
 
     const syncMachinesTransactions = async () => {
         try {
-            const response = await fetch(
-                "https://api-dom.jbmidia.com/payments/admin/sync-machines-transactions",
-                {
-                    method: "POST",
-                    headers: {
-                        "x-access-token": "4a29df01-a980-45e3-b3c7-1a8b8eb7850f",
-                        "Content-Type": "application/json",
-                    },
-                }
-            );
+            const response = await fetch(`${MACHINE_API_URL}/admin/sync/maquinetas`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+            });
 
             if (!response.ok) {
                 throw new Error("Erro ao sincronizar transações das maquinetas");
@@ -79,15 +70,9 @@ const MachinesPage = () => {
             setLoading(true);
             setError(null);
 
-            const response = await fetch(
-                "https://api-dom.jbmidia.com/payments/dom/specific-machines-transactions",
-                {
-                    headers: {
-                        "x-access-token": "4a29df01-a980-45e3-b3c7-1a8b8eb7850f",
-                        "Content-Type": "application/json",
-                    },
-                }
-            );
+            const response = await fetch(`${MACHINE_API_URL}/admin/renovada/machines?limit=100`, {
+                headers: { "Content-Type": "application/json" },
+            });
 
             if (!response.ok) {
                 throw new Error("Erro ao carregar dados das maquinetas");
@@ -115,12 +100,14 @@ const MachinesPage = () => {
 
     const getStatusColor = (status: string) => {
         switch (status) {
-            case "paid":
+            case "completed":
                 return "bg-green-100 text-green-800";
-            case "not_authorized":
+            case "failed":
                 return "bg-red-100 text-red-800";
             case "pending":
                 return "bg-yellow-100 text-yellow-800";
+            case "refunded":
+                return "bg-blue-100 text-blue-800";
             default:
                 return "bg-gray-100 text-gray-800";
         }
@@ -160,13 +147,14 @@ const MachinesPage = () => {
 
 
 
-    const filteredTransactions = data?.transactions.filter((transaction) => {
-        const machineMatch = !selectedMachine ||
-            transaction.customer_name.includes(`Terminal: ${selectedMachine}`);
+    const machines = [...new Set((data?.transactions || []).map((t: any) => t.terminal).filter(Boolean))];
+
+    const filteredTransactions = data?.transactions.filter((transaction: any) => {
+        const machineMatch = !selectedMachine || transaction.terminal === selectedMachine;
         const statusMatch = !statusFilter || transaction.status === statusFilter;
 
         // Filtro por data
-        const transactionDate = new Date(transaction.created_at);
+        const transactionDate = new Date(transaction.createdAt || transaction.created_at);
         const startDateFilter = !startDate || transactionDate >= startDate;
         const endDateFilter = !endDate || transactionDate <= new Date(endDate.getTime() + 24 * 60 * 60 * 1000 - 1); // Fim do dia
 
@@ -190,15 +178,15 @@ const MachinesPage = () => {
 
         const csvContent = [
             headers.join(","),
-            ...filteredTransactions.map(transaction => [
+            ...filteredTransactions.map((transaction: any) => [
                 transaction.id,
-                formatDate(transaction.created_at),
-                transaction.customer_name.replace("Terminal: ", ""),
+                formatDate(transaction.createdAt || transaction.created_at),
+                transaction.terminal || transaction.customer_name?.replace("Terminal: ", ""),
                 transaction.profit_minus_tax,
-                transaction.status_details,
-                getPaymentMethodText(transaction.payment_method),
-                transaction.card_brand,
-                transaction.cod_external
+                transaction.statusDetails || transaction.status_details,
+                getPaymentMethodText(transaction.paymentMethod || transaction.payment_method),
+                transaction.cardBrand || transaction.card_brand,
+                transaction.domTransactionId || transaction.cod_external
             ].join(","))
         ].join("\n");
 
@@ -303,7 +291,7 @@ const MachinesPage = () => {
                             </div>
                             <div className="ml-4">
                                 <p className="text-sm font-medium text-gray-600">Total de Transações</p>
-                                <p className="text-2xl font-bold text-gray-900">{data.total}</p>
+                                <p className="text-2xl font-bold text-gray-900">{data.meta.total}</p>
                             </div>
                         </div>
                     </div>
@@ -314,7 +302,7 @@ const MachinesPage = () => {
                             </div>
                             <div className="ml-4">
                                 <p className="text-sm font-medium text-gray-600">Maquinetas Ativas</p>
-                                <p className="text-2xl font-bold text-gray-900">{data.machines.length}</p>
+                                <p className="text-2xl font-bold text-gray-900">{machines.length}</p>
                             </div>
                         </div>
                     </div>
@@ -353,7 +341,7 @@ const MachinesPage = () => {
                             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                         >
                             <option value="">Todos os terminais</option>
-                            {data?.machines.map((machine) => (
+                            {machines.map((machine) => (
                                 <option key={machine} value={machine}>
                                     {machine}
                                 </option>
@@ -370,9 +358,10 @@ const MachinesPage = () => {
                             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                         >
                             <option value="">Todos os status</option>
-                            <option value="paid">Aprovado</option>
-                            <option value="not_authorized">Não Autorizado</option>
+                            <option value="completed">Aprovado</option>
+                            <option value="failed">Falhou</option>
                             <option value="pending">Pendente</option>
+                            <option value="refunded">Estornado</option>
                         </select>
                     </div>
                     <div>
@@ -456,13 +445,13 @@ const MachinesPage = () => {
                             </tr>
                         </thead>
                         <tbody className="bg-white divide-y divide-gray-200">
-                            {filteredTransactions.map((transaction) => (
+                            {filteredTransactions.map((transaction: any) => (
                                 <tr key={transaction.id} className="hover:bg-gray-50">
                                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                        {formatDate(transaction.created_at)}
+                                        {formatDate(transaction.createdAt || transaction.created_at)}
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                        {transaction.customer_name.replace("Terminal: ", "")}
+                                        {transaction.terminal || transaction.customer_name?.replace("Terminal: ", "")}
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                                         <div className="font-medium">{formatCurrency(transaction.profit_minus_tax)}</div>
@@ -473,17 +462,17 @@ const MachinesPage = () => {
                                                 transaction.status
                                             )}`}
                                         >
-                                            {transaction.status_details}
+                                            {transaction.statusDetails || transaction.status_details}
                                         </span>
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                        {getPaymentMethodText(transaction.payment_method)}
+                                        {getPaymentMethodText(transaction.paymentMethod || transaction.payment_method)}
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                        {transaction.card_brand}
+                                        {transaction.cardBrand || transaction.card_brand}
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                        {transaction.cod_external}
+                                        {transaction.domTransactionId || transaction.cod_external}
                                     </td>
                                 </tr>
                             ))}

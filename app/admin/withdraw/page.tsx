@@ -1,5 +1,6 @@
 "use client";
 import React, { useEffect, useState } from "react";
+import { MACHINE_API_URL, INTERNAL_API_URL, RENOVADA_USER_ID } from "@/constants/api";
 import { Wallet, RefreshCw, DollarSign, ArrowUpRight, ArrowDownLeft, History, FileText, Download, Eye, Info } from "lucide-react";
 import { Tooltip } from "@/components/ui/tooltip";
 import { Button } from "@/components/ui/global";
@@ -14,19 +15,17 @@ import {
 } from "@/components/ui/dialog";
 import { toast } from 'react-toastify';
 
+interface PlatformFees {
+    taxaFixa: number;
+    taxaPercent: number;
+    saqueMin: number;
+}
+
 interface FinancialSummary {
     availableBalance: number;
-    netBalance: number;
     pendingWithdraws: number;
     lockedBalance: number;
-    netLockedBalance: number;
-    wallet: {
-        id: string;
-        userId: string;
-        version: number;
-        updatedAt: string;
-        lastWithDrawDate: string;
-    };
+    netLockedBalance?: string | number;
 }
 
 interface Withdrawal {
@@ -80,15 +79,52 @@ const WithdrawPage = () => {
     const [selectedReceiptImage, setSelectedReceiptImage] = useState("");
     const [hasPendingWithdrawal, setHasPendingWithdrawal] = useState(false);
     const [pendingWithdrawal, setPendingWithdrawal] = useState<Withdrawal | null>(null);
+    const [platformFees, setPlatformFees] = useState<PlatformFees>({ taxaFixa: 2, taxaPercent: 0, saqueMin: 100 });
+    const [isSyncing, setIsSyncing] = useState(false);
+
+    const handleSyncWithdrawals = async () => {
+        setIsSyncing(true);
+        try {
+            const response = await fetch(`${MACHINE_API_URL}/admin/sync-withdrawals`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ userId: RENOVADA_USER_ID }),
+            });
+            if (!response.ok) throw new Error("Falha ao sincronizar");
+            const data = await response.json();
+            const { created, updated, total } = data?.data ?? {};
+            toast.success(`Sincronização concluída: ${created} criados, ${updated} atualizados (${total} total)`);
+            fetchWithdrawals(1);
+        } catch {
+            toast.error("Não foi possível sincronizar o histórico de saques.");
+        } finally {
+            setIsSyncing(false);
+        }
+    };
+
+    const fetchPlatformFees = async () => {
+        try {
+            const response = await fetch(`${MACHINE_API_URL}/admin/plataformas/taxas`);
+            if (!response.ok) return;
+            const data = await response.json();
+            const renovada = data?.data?.RENOVADA;
+            if (renovada) {
+                setPlatformFees({
+                    taxaFixa: renovada.TAXA_SAQUE_FIXA ?? 2,
+                    taxaPercent: renovada.TAXA_SAQUE_PERCENT ?? 0,
+                    saqueMin: renovada.SAQUE_MIN ?? 100,
+                });
+            }
+        } catch {}
+    };
 
     const fetchFinancialSummary = async () => {
         try {
             setLoading(true);
             setError(null);
 
-            const response = await fetch("https://api-dom.jbmidia.com/payments/summary", {
+            const response = await fetch(`${INTERNAL_API_URL}/renovada/finance/summary?userId=${RENOVADA_USER_ID}`, {
                 headers: {
-                    "x-access-token": "4a29df01-a980-45e3-b3c7-1a8b8eb7850f",
                     "Content-Type": "application/json",
                 },
             });
@@ -109,17 +145,17 @@ const WithdrawPage = () => {
     useEffect(() => {
         fetchFinancialSummary();
         fetchWithdrawals(1);
+        fetchPlatformFees();
     }, []);
 
     const fetchWithdrawals = async (page = 1) => {
         try {
             const response = await fetch(
-                `https://api-dom.jbmidia.com/payments/withdrawals?page=${page}&limit=${withdrawalsPaginationMeta.itemsPerPage}`,
+                `${INTERNAL_API_URL}/renovada/finance/withdrawals?userId=${RENOVADA_USER_ID}&page=${page}&limit=${withdrawalsPaginationMeta.itemsPerPage}`,
                 {
                     headers: {
                         accept: "*/*",
-                        "x-access-token": "4a29df01-a980-45e3-b3c7-1a8b8eb7850f",
-                        "Content-Type": "application/json",
+                            "Content-Type": "application/json",
                     },
                 }
             );
@@ -256,26 +292,26 @@ const WithdrawPage = () => {
             return;
         }
 
-        if (parseFloat(withdrawalAmount) < 100) {
-            toast.error("O valor mínimo para saque deve ser de R$ 100,00");
+        if (parseFloat(withdrawalAmount) < platformFees.saqueMin) {
+            toast.error(`O valor mínimo para saque deve ser de ${formatCurrency(platformFees.saqueMin)}`);
             return;
         }
 
-        if (parseFloat(withdrawalAmount) > financialSummary!.availableBalance - 2) {
-            toast.error("Valor insuficiente para saque (considere a taxa de R$ 2,00)");
+        if (parseFloat(withdrawalAmount) > financialSummary!.availableBalance) {
+            toast.error(`Valor insuficiente. Saldo disponível: ${formatCurrency(financialSummary!.availableBalance)}`);
             return;
         }
 
         setIsWithdrawing(true);
         try {
-            const response = await fetch("https://api-dom.jbmidia.com/payments/withdraw", {
+            const response = await fetch(`${INTERNAL_API_URL}/renovada/finance/withdraw`, {
                 method: "POST",
                 headers: {
                     accept: "*/*",
-                    "x-access-token": "4a29df01-a980-45e3-b3c7-1a8b8eb7850f",
                     "Content-Type": "application/json",
                 },
                 body: JSON.stringify({
+                    userId: RENOVADA_USER_ID,
                     amount: parseFloat(withdrawalAmount),
                     pixKey: pixKey.trim(),
                 }),
@@ -286,7 +322,8 @@ const WithdrawPage = () => {
                 throw new Error(errorData.message || "Falha ao solicitar saque");
             }
 
-            toast.success(`PIX enviado com sucesso! ✅ Seu saque de ${formatCurrency(parseFloat(withdrawalAmount))} foi processado e está sendo transferido para sua conta.`);
+            const netPayout = parseFloat((parseFloat(withdrawalAmount) - platformFees.taxaFixa).toFixed(2));
+            toast.success(`PIX enviado com sucesso! ✅ Você receberá ${formatCurrency(netPayout)} em sua conta.`);
 
             setIsModalOpen(false);
             setWithdrawalAmount("");
@@ -365,14 +402,10 @@ const WithdrawPage = () => {
                     </button>
                     <button
                         onClick={() => setIsModalOpen(true)}
-                        disabled={hasPendingWithdrawal}
-                        className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition-colors ${hasPendingWithdrawal
-                            ? "bg-gray-400 text-gray-200 cursor-not-allowed"
-                            : "bg-green-600 text-white hover:bg-green-700"
-                            }`}
+                        className="flex items-center space-x-2 px-4 py-2 rounded-lg transition-colors bg-green-600 text-white hover:bg-green-700"
                     >
                         <Wallet className="w-4 h-4" />
-                        <span>{hasPendingWithdrawal ? "Saque Pendente" : "Solicitar Saque"}</span>
+                        <span>Solicitar Saque</span>
                     </button>
                 </div>
             </div>
@@ -459,7 +492,7 @@ const WithdrawPage = () => {
                                     <div className="ml-4">
                                         <p className="text-sm font-medium text-gray-600">Saldo disponível</p>
                                         <p className="text-2xl font-bold text-gray-900">
-                                            {formatCurrency(financialSummary.netBalance)}
+                                            {formatCurrency(financialSummary.availableBalance)}
                                         </p>
                                     </div>
                                 </div>
@@ -473,7 +506,7 @@ const WithdrawPage = () => {
                                     <div className="ml-4">
                                         <p className="text-sm font-medium text-gray-600">Saque em processo</p>
                                         <p className="text-2xl font-bold text-gray-900">
-                                            {formatCurrency(financialSummary.pendingWithdraws)}
+                                            {formatCurrency(Number(financialSummary.netLockedBalance ?? financialSummary.pendingWithdraws))}
                                         </p>
                                     </div>
                                 </div>
@@ -487,7 +520,7 @@ const WithdrawPage = () => {
                                     <div className="ml-4">
                                         <p className="text-sm font-medium text-gray-600">Saldo em processamento</p>
                                         <p className="text-2xl font-bold text-gray-900">
-                                            {formatCurrency(financialSummary.netLockedBalance)}
+                                            {formatCurrency(financialSummary.lockedBalance)}
                                         </p>
                                     </div>
                                 </div>
@@ -495,35 +528,43 @@ const WithdrawPage = () => {
                         </div>
                     )}
 
-                    {/* Informações da Carteira */}
-                    {financialSummary && (
-                        <div className="bg-white p-6 rounded-lg shadow">
-                            <h3 className="text-lg font-semibold text-gray-900 mb-4">Informações da Carteira</h3>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div>
-                                    <p className="text-sm font-medium text-gray-600">Última atualização</p>
-                                    <p className="text-gray-900">{formatDate(financialSummary.wallet.updatedAt)}</p>
-                                </div>
-                                <div>
-                                    <p className="text-sm font-medium text-gray-600">Último saque</p>
-                                    <p className="text-gray-900">
-                                        {financialSummary.wallet.lastWithDrawDate
-                                            ? formatDate(financialSummary.wallet.lastWithDrawDate)
-                                            : "Nenhum saque realizado"
-                                        }
-                                    </p>
-                                </div>
+                    {/* Taxas da Plataforma */}
+                    <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                        <div className="flex items-start gap-2">
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-gray-500 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                            <div className="text-sm text-gray-600 space-y-1">
+                                <p>
+                                    <span className="font-medium">Taxa de saque:</span>{" "}
+                                    {formatCurrency(platformFees.taxaFixa)}
+                                    {platformFees.taxaPercent > 0
+                                        ? ` + ${(platformFees.taxaPercent * 100).toFixed(2)}% do valor`
+                                        : ""}
+                                </p>
+                                <p>
+                                    <span className="font-medium">Valor mínimo:</span>{" "}
+                                    {formatCurrency(platformFees.saqueMin)}
+                                </p>
                             </div>
                         </div>
-                    )}
+                    </div>
                 </>
             )}
 
             {activeTab === "history" && (
                 <div className="space-y-6">
                     <div className="bg-white rounded-lg shadow">
-                        <div className="px-6 py-4 border-b border-gray-200">
+                        <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
                             <h3 className="text-lg font-semibold text-gray-900">Histórico de Saques</h3>
+                            <button
+                                onClick={handleSyncWithdrawals}
+                                disabled={isSyncing}
+                                className="flex items-center space-x-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors text-sm disabled:opacity-50"
+                            >
+                                <RefreshCw className={`w-4 h-4 ${isSyncing ? "animate-spin" : ""}`} />
+                                <span>{isSyncing ? "Sincronizando..." : "Sincronizar Histórico"}</span>
+                            </button>
                         </div>
                         <div className="overflow-x-auto">
                             <table className="min-w-full divide-y divide-gray-200">
@@ -588,7 +629,7 @@ const WithdrawPage = () => {
                                                     >
                                                         {withdrawal.status === "COMPLETED" ? "Concluído" :
                                                             withdrawal.status === "PENDING" ? "Aguardando Aprovação" :
-                                                                withdrawal.status === "APPROVED" ? "Aprovado - Processando" :
+                                                                withdrawal.status === "APPROVED" ? "Aprovado" :
                                                                     withdrawal.status === "FAILED" ? "Falhou" :
                                                                         withdrawal.status === "REJECTED" ? "Recusado" : withdrawal.status}
                                                     </span>
@@ -692,7 +733,7 @@ const WithdrawPage = () => {
                                         value={withdrawalAmount}
                                         onChange={handleAmountChange}
                                         disabled={hasPendingWithdrawal}
-                                        className={`pl-8 ${hasPendingWithdrawal ? "bg-gray-100 cursor-not-allowed" : ""} ${parseFloat(withdrawalAmount) > (financialSummary?.availableBalance || 0) - 2
+                                        className={`pl-8 ${hasPendingWithdrawal ? "bg-gray-100 cursor-not-allowed" : ""} ${parseFloat(withdrawalAmount) > (financialSummary?.availableBalance || 0)
                                             ? "border-red-500 focus:ring-red-500"
                                             : ""
                                             }`}
@@ -700,7 +741,7 @@ const WithdrawPage = () => {
                                     />
                                 </div>
                                 <p className="text-sm text-gray-500 mt-1">
-                                    Saldo disponível: {formatCurrency(financialSummary?.netBalance || 0)}
+                                    Saldo disponível: {formatCurrency(financialSummary?.availableBalance || 0)}
                                 </p>
                             </div>
                         </div>
@@ -721,10 +762,17 @@ const WithdrawPage = () => {
                             </div>
                         </div>
                         <p className="text-sm text-gray-500 text-center">
-                            Será cobrada uma taxa de R$ 2,00 por saque
+                            {platformFees.taxaPercent > 0
+                                ? `Será cobrada uma taxa de ${formatCurrency(platformFees.taxaFixa)} + ${(platformFees.taxaPercent * 100).toFixed(2)}% por saque`
+                                : `Será cobrada uma taxa de ${formatCurrency(platformFees.taxaFixa)} por saque`}
                         </p>
+                        {withdrawalAmount && parseFloat(withdrawalAmount) > 0 && (
+                            <p className="text-sm text-green-700 font-medium text-center mt-1">
+                                Você receberá: {formatCurrency(Math.max(0, parseFloat(withdrawalAmount) - platformFees.taxaFixa))}
+                            </p>
+                        )}
                         <p className="text-sm text-red-500 font-medium text-center mt-1">
-                            O valor mínimo para saque deve ser de R$ 100,00
+                            O valor mínimo para saque deve ser de {formatCurrency(platformFees.saqueMin)}
                         </p>
                     </div>
                     <DialogFooter>
@@ -746,8 +794,8 @@ const WithdrawPage = () => {
                                 isWithdrawing ||
                                 !withdrawalAmount ||
                                 !pixKey ||
-                                parseFloat(withdrawalAmount) < 100 ||
-                                parseFloat(withdrawalAmount) > (financialSummary?.availableBalance || 0) - 2
+                                parseFloat(withdrawalAmount) < platformFees.saqueMin ||
+                                parseFloat(withdrawalAmount) > (financialSummary?.availableBalance || 0)
                             }
                             className={`${hasPendingWithdrawal
                                 ? "bg-gray-400 hover:bg-gray-400 cursor-not-allowed"
