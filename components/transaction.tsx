@@ -87,6 +87,19 @@ const stripInternalTags = (description?: string | null) => {
   return description.replace(/\[TENANT:[^\]]+\]/gi, "").replace(/\[CPF_DONO:[^\]]+\]/gi, "").trim();
 };
 
+const getLocalDateString = (dateInput: string | Date) => {
+  try {
+    const date = new Date(dateInput);
+    if (isNaN(date.getTime())) return "";
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  } catch {
+    return "";
+  }
+};
+
 const formatCPFCNPJ = (value: string) => {
   const numbersOnly = value.replace(/\D/g, "");
 
@@ -208,11 +221,26 @@ const TransactionsPage = () => {
         { header: "Valor Recebido", key: "valor", width: 15 },
       ];
       const transactions0 = exportData.transactions ?? exportData;
+      
+      // Strict client-side date filtering to handle timezone shifts
+      const filteredTransactions0 = transactions0.filter((t: any) => {
+        const tDate = getLocalDateString(t.createdAt);
+        if (startDate && tDate < startDate) return false;
+        if (endDate && tDate > endDate) return false;
+        return true;
+      });
+
       // Format data before export
-      const formattedTransactions = transactions0.map((transaction: any) => ({
-        ...transaction,
-        createdAt: new Date(transaction.createdAt).toLocaleDateString("pt-BR"),
-        amountWithoutAllFee: formatCurrency(transaction.amountWithoutAllFee),
+      const formattedTransactions = filteredTransactions0.map((transaction: any) => ({
+        nome: transaction.name || "",
+        data: new Date(transaction.createdAt).toLocaleDateString("pt-BR"),
+        tipo: stripInternalTags(transaction.description),
+        email: transaction.email || "",
+        "número de telefone": transaction.customer_phone || "",
+        documento: transaction.customer_document || "",
+        "tipo do documento": transaction.customer_document_type || "",
+        "método de pagamento": getTranslatedPaymentMethod(transaction.payment_method),
+        valor: formatCurrency(transaction.amountWithoutAllFee),
       }));
 
       // Generate and download Excel file
@@ -244,7 +272,7 @@ const TransactionsPage = () => {
         {
           headers: {
             accept: "*/*",
-              "Content-Type": "application/json",
+            "Content-Type": "application/json",
           },
         }
       );
@@ -299,7 +327,7 @@ const TransactionsPage = () => {
         },
       });
       const data: TransactionResponse = await response.json();
-      setTransactions(data.transactions);
+      setTransactions(data.transactions || []);
       setPaginationMeta(data.meta);
     } catch (error) {
       toast.error("Não foi possível carregar as transações.");
@@ -472,7 +500,7 @@ const TransactionsPage = () => {
     }
   };
 
-  const renderTransactionTable = (data: Transaction[]) => (
+  const renderTransactionTable = (data: Transaction[] = []) => (
     <div className="overflow-auto">
       <div className="rounded-md border min-w-[800px] lg:min-w-full">
         <Table>
@@ -490,7 +518,7 @@ const TransactionsPage = () => {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {data.map((transaction) => (
+            {data?.map((transaction) => (
               <TableRow key={transaction.id}>
                 <TableCell className="whitespace-nowrap">
                   {new Date(transaction.createdAt).toLocaleDateString("pt-BR")}
@@ -524,7 +552,7 @@ const TransactionsPage = () => {
           </TableBody>
         </Table>
       </div>
-      {data.length > 0 &&
+      {data && data.length > 0 &&
         renderPagination(
           paginationMeta.currentPage,
           paginationMeta.totalPages,
@@ -650,7 +678,14 @@ const TransactionsPage = () => {
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" />
             </div>
           ) : (
-            renderTransactionTable(transactions)
+            renderTransactionTable(
+              transactions.filter((t: any) => {
+                const tDate = getLocalDateString(t.createdAt);
+                if (startDate && tDate < startDate) return false;
+                if (endDate && tDate > endDate) return false;
+                return true;
+              })
+            )
           )}
         </TabsContent>
 

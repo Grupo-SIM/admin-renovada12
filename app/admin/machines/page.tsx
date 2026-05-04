@@ -3,6 +3,7 @@ import React, { useEffect, useState } from "react";
 import { CreditCard, RefreshCw, Filter, Download, Calendar } from "lucide-react";
 import { DatePicker } from "@/components/ui/date-picker";
 import { MACHINE_API_URL } from "@/constants/api";
+import { jsonToExcel } from "@/services/excel";
 
 interface Transaction {
     id: string;
@@ -161,34 +162,32 @@ const MachinesPage = () => {
         return machineMatch && statusMatch && startDateFilter && endDateFilter;
     }) || [];
 
-    const exportToCSV = () => {
+    const handleExportExcel = () => {
         if (!filteredTransactions.length) return;
 
-        const headers = [
-            "ID",
-            "Data",
-            "Terminal",
-            "Valor",
-            "Lucro Líquido",
-            "Status",
-            "Método de Pagamento",
-            "Bandeira",
-            "NSU"
+        const columns = [
+            { header: "ID", key: "id", width: 20 },
+            { header: "Data", key: "data", width: 20 },
+            { header: "Terminal", key: "terminal", width: 20 },
+            { header: "Valor", key: "valor", width: 15 },
+            { header: "Lucro Líquido", key: "lucro", width: 15 },
+            { header: "Status", key: "status", width: 15 },
+            { header: "Método de Pagamento", key: "metodo", width: 20 },
+            { header: "Bandeira", key: "bandeira", width: 15 },
+            { header: "NSU", key: "nsu", width: 25 }
         ];
 
-        const csvContent = [
-            headers.join(","),
-            ...filteredTransactions.map((transaction: any) => [
-                transaction.id,
-                formatDate(transaction.createdAt || transaction.created_at),
-                transaction.terminal || transaction.customer_name?.replace("Terminal: ", ""),
-                transaction.profit_minus_tax,
-                transaction.statusDetails || transaction.status_details,
-                getPaymentMethodText(transaction.paymentMethod || transaction.payment_method),
-                transaction.cardBrand || transaction.card_brand,
-                transaction.domTransactionId || transaction.cod_external
-            ].join(","))
-        ].join("\n");
+        const formattedData = filteredTransactions.map((transaction: any) => ({
+            id: transaction.id,
+            data: formatDate(transaction.createdAt || transaction.created_at),
+            terminal: transaction.terminal || transaction.customer_name?.replace("Terminal: ", ""),
+            valor: formatCurrency(transaction.amount || 0),
+            lucro: formatCurrency(transaction.profit_minus_tax || 0),
+            status: transaction.statusDetails || transaction.status_details,
+            metodo: getPaymentMethodText(transaction.paymentMethod || transaction.payment_method),
+            bandeira: transaction.cardBrand || transaction.card_brand,
+            nsu: transaction.domTransactionId || transaction.cod_external
+        }));
 
         const formatDateForFilename = (date: Date) => {
             return date.toLocaleDateString("pt-BR", {
@@ -206,21 +205,11 @@ const MachinesPage = () => {
                     ? `_ate_${formatDateForFilename(endDate)}`
                     : "";
 
-        const currentDate = new Date().toLocaleDateString("pt-BR", {
-            day: "2-digit",
-            month: "2-digit",
-            year: "2-digit"
-        }).replace(/\//g, "-");
-
-        const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-        const link = document.createElement("a");
-        const url = URL.createObjectURL(blob);
-        link.setAttribute("href", url);
-        link.setAttribute("download", `maquinetas${dateRange}_${currentDate}.csv`);
-        link.style.visibility = "hidden";
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
+        jsonToExcel(
+            formattedData,
+            columns,
+            `maquinetas${dateRange}_${new Date().toISOString().split("T")[0]}`
+        );
     };
 
     if (loading) {
@@ -272,11 +261,11 @@ const MachinesPage = () => {
                         <span>Atualizar</span>
                     </button>
                     <button
-                        onClick={exportToCSV}
+                        onClick={handleExportExcel}
                         className="flex items-center space-x-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
                     >
                         <Download className="w-4 h-4" />
-                        <span>Exportar CSV</span>
+                        <span>Exportar Excel</span>
                     </button>
                 </div>
             </div>
