@@ -1,7 +1,7 @@
 "use client";
 import React, { useEffect, useState } from "react";
 import { MACHINE_API_URL, INTERNAL_API_URL, RENOVADA_USER_ID } from "@/constants/api";
-import { Wallet, RefreshCw, DollarSign, ArrowUpRight, ArrowDownLeft, History, FileText, Download, Eye, Info } from "lucide-react";
+import { Wallet, RefreshCw, DollarSign, ArrowUpRight, ArrowDownLeft, History, FileText, Download, Eye, EyeOff, Upload, Info } from "lucide-react";
 import { Tooltip } from "@/components/ui/tooltip";
 import { Button } from "@/components/ui/global";
 import { Input } from "@/components/ui/input";
@@ -35,6 +35,7 @@ interface Withdrawal {
     status: "PENDING" | "COMPLETED" | "FAILED" | "APPROVED" | "REJECTED";
     pixKey: string;
     receiptImage?: string;
+    comprovanteVisivel?: boolean;
     fee?: string;
     rejectionReason?: string | null;
     createdAt: string;
@@ -77,6 +78,11 @@ const WithdrawPage = () => {
     const [feriadoInfo, setFeriadoInfo] = useState<{ name: string } | null>(null);
     const [isReceiptModalOpen, setIsReceiptModalOpen] = useState(false);
     const [selectedReceiptImage, setSelectedReceiptImage] = useState("");
+    const [isUploadReceiptOpen, setIsUploadReceiptOpen] = useState(false);
+    const [selectedUploadWithdrawal, setSelectedUploadWithdrawal] = useState<Withdrawal | null>(null);
+    const [uploadReceiptFile, setUploadReceiptFile] = useState<File | null>(null);
+    const [isUploadingReceipt, setIsUploadingReceipt] = useState(false);
+    const [togglingVisibilityId, setTogglingVisibilityId] = useState<string | null>(null);
     const [hasPendingWithdrawal, setHasPendingWithdrawal] = useState(false);
     const [pendingWithdrawal, setPendingWithdrawal] = useState<Withdrawal | null>(null);
     const [platformFees, setPlatformFees] = useState<PlatformFees>({ taxaFixa: 2, taxaPercent: 0, saqueMin: 100 });
@@ -150,21 +156,42 @@ const WithdrawPage = () => {
 
     const fetchWithdrawals = async (page = 1) => {
         try {
-            const response = await fetch(
-                `${INTERNAL_API_URL}/renovada/finance/withdrawals?userId=${RENOVADA_USER_ID}&page=${page}&limit=${withdrawalsPaginationMeta.itemsPerPage}`,
-                {
-                    headers: {
-                        accept: "*/*",
-                            "Content-Type": "application/json",
-                    },
-                }
-            );
-            const data: WithdrawalResponse = await response.json();
-            setWithdrawals(data.withdrawals);
-            setWithdrawalsPaginationMeta(data.meta);
+            const limit = withdrawalsPaginationMeta.itemsPerPage;
+            const [internalResult, machineResult] = await Promise.allSettled([
+                fetch(
+                    `${INTERNAL_API_URL}/renovada/finance/withdrawals?userId=${RENOVADA_USER_ID}&page=${page}&limit=${limit}`,
+                    { headers: { accept: "*/*", "Content-Type": "application/json" } }
+                ),
+                fetch(`${MACHINE_API_URL}/admin/saques?page=1&pageSize=500`, { headers: { accept: "*/*" } }),
+            ]);
 
-            // Verificar se há saque pendente
-            checkPendingWithdrawal(data.withdrawals);
+            if (internalResult.status === "rejected") throw internalResult.reason;
+            const data: WithdrawalResponse = await internalResult.value.json();
+
+            // Build receipt lookup from machine API (internal API doesn't return receiptImage)
+            const receiptMap = new Map<string, { comprovante: string | null; comprovanteVisivel?: boolean }>();
+            if (machineResult.status === "fulfilled" && machineResult.value.ok) {
+                const machineData = await machineResult.value.json();
+                const saques: Array<{ id: string; comprovante?: string | null; comprovanteVisivel?: boolean }> =
+                    machineData?.data ?? [];
+                for (const s of saques) {
+                    if (s.id) receiptMap.set(s.id, { comprovante: s.comprovante ?? null, comprovanteVisivel: s.comprovanteVisivel });
+                }
+            }
+
+            const merged = (data.withdrawals ?? []).map((w) => {
+                const m = receiptMap.get(w.id);
+                if (!m) return w;
+                return {
+                    ...w,
+                    receiptImage: w.receiptImage ?? m.comprovante ?? undefined,
+                    comprovanteVisivel: w.comprovanteVisivel ?? m.comprovanteVisivel,
+                };
+            });
+
+            setWithdrawals(merged);
+            setWithdrawalsPaginationMeta(data.meta);
+            checkPendingWithdrawal(merged);
         } catch (error) {
             console.error("Erro ao carregar histórico de saques:", error);
         }
@@ -211,6 +238,54 @@ const WithdrawPage = () => {
     const openReceiptModal = (imageUrl: string) => {
         setSelectedReceiptImage(imageUrl);
         setIsReceiptModalOpen(true);
+    };
+
+    const handleUploadReceipt = async () => {
+        if (!selectedUploadWithdrawal || !uploadReceiptFile) return;
+        setIsUploadingReceipt(true);
+        try {
+            const formData = new FormData();
+            formData.append("file", uploadReceiptFile);
+            const response = await fetch(`${MACHINE_API_URL}/admin/renovada/withdrawals/${selectedUploadWithdrawal.id}/comprovante`, {
+                method: "PATCH",
+                body: formData,
+            });
+            if (!response.ok) {
+                const err = await response.json().catch(() => ({}));
+                throw new Error(err.message || "Erro ao salvar comprovante");
+            }
+            toast.success("Comprovante atualizado com sucesso!");
+            setIsUploadReceiptOpen(false);
+            setUploadReceiptFile(null);
+            setSelectedUploadWithdrawal(null);
+            fetchWithdrawals(withdrawalsPaginationMeta.currentPage);
+        } catch (error) {
+            toast.error(error instanceof Error ? error.message : "Erro ao salvar comprovante");
+        } finally {
+            setIsUploadingReceipt(false);
+        }
+    };
+
+    const handleToggleVisibility = async (withdrawal: Withdrawal) => {
+        const novoValor = withdrawal.comprovanteVisivel === false ? true : false;
+        setTogglingVisibilityId(withdrawal.id);
+        try {
+            const response = await fetch(`${MACHINE_API_URL}/admin/renovada/withdrawals/${withdrawal.id}/visibilidade`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ comprovanteVisivel: novoValor }),
+            });
+            if (!response.ok) {
+                const err = await response.json().catch(() => ({}));
+                throw new Error(err.message || "Erro ao alterar visibilidade");
+            }
+            setWithdrawals(prev => prev.map(w => w.id === withdrawal.id ? { ...w, comprovanteVisivel: novoValor } : w));
+            toast.success(novoValor ? "Comprovante visível para o cliente" : "Comprovante oculto para o cliente");
+        } catch (error) {
+            toast.error(error instanceof Error ? error.message : "Erro ao alterar visibilidade");
+        } finally {
+            setTogglingVisibilityId(null);
+        }
     };
 
     const formatDate = (dateString: string) => {
@@ -640,42 +715,52 @@ const WithdrawPage = () => {
                                                     )}
                                                 </div>
                                             </td>
-                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                                {withdrawal.receiptImage ? (
-                                                    <div className="flex items-center space-x-3">
-                                                        {/* Botões de Ação */}
-                                                        <div className="flex space-x-2">
-                                                            {/* Botão Visualizar */}
-                                                            <Button
-                                                                size="sm"
-                                                                variant="outline"
+                                            <td className="px-6 py-4 text-sm text-gray-900">
+                                                <div className="flex flex-col gap-2 min-w-[160px]">
+                                                    {/* Visualizar / Download */}
+                                                    {withdrawal.receiptImage ? (
+                                                        <div className="flex items-center gap-2">
+                                                            <Button size="sm" variant="outline"
                                                                 onClick={() => openReceiptModal(withdrawal.receiptImage!)}
-                                                                className="flex items-center space-x-1 text-xs px-3 py-1.5 h-8 bg-white hover:bg-gray-50 border-gray-300 text-gray-700 hover:text-gray-900"
-                                                            >
-                                                                <Eye className="w-3 h-3" />
-                                                                <span>Ver</span>
+                                                                className="flex items-center gap-1 text-xs px-2.5 py-1 h-7 bg-white hover:bg-gray-50 border-gray-300 text-gray-700">
+                                                                <Eye className="w-3 h-3" /><span>Ver</span>
                                                             </Button>
-
-                                                            {/* Botão Download */}
-                                                            <Button
-                                                                size="sm"
-                                                                variant="outline"
+                                                            <Button size="sm" variant="outline"
                                                                 onClick={() => downloadImage(withdrawal.receiptImage!, `nota-fiscal-${withdrawal.id.slice(-8)}.png`)}
-                                                                className="flex items-center space-x-1 text-xs px-3 py-1.5 h-8 bg-white hover:bg-green-50 border-green-300 text-green-700 hover:text-green-900"
-                                                            >
-                                                                <Download className="w-3 h-3" />
-                                                                <span>Baixar</span>
+                                                                className="flex items-center gap-1 text-xs px-2.5 py-1 h-7 bg-white hover:bg-green-50 border-green-300 text-green-700">
+                                                                <Download className="w-3 h-3" /><span>Baixar</span>
                                                             </Button>
                                                         </div>
-                                                    </div>
-                                                ) : (
-                                                    <div className="flex items-center space-x-2">
-                                                        <div className="flex items-center justify-center w-10 h-10 bg-gray-50 rounded-lg border border-gray-200">
-                                                            <FileText className="w-5 h-5 text-gray-400" />
-                                                        </div>
-                                                        <span className="text-gray-400 text-sm">Não disponível</span>
-                                                    </div>
-                                                )}
+                                                    ) : (
+                                                        <span className="text-gray-400 text-xs">Sem comprovante</span>
+                                                    )}
+
+                                                    {/* Trocar / Adicionar comprovante */}
+                                                    <button
+                                                        onClick={() => { setSelectedUploadWithdrawal(withdrawal); setUploadReceiptFile(null); setIsUploadReceiptOpen(true); }}
+                                                        className="flex items-center gap-1.5 text-xs text-violet-600 hover:text-violet-800 font-medium transition-colors"
+                                                    >
+                                                        <Upload className="w-3 h-3" />
+                                                        {withdrawal.receiptImage ? "Trocar imagem" : "Adicionar imagem"}
+                                                    </button>
+
+                                                    {/* Toggle visível para cliente */}
+                                                    <button
+                                                        disabled={togglingVisibilityId === withdrawal.id}
+                                                        onClick={() => handleToggleVisibility(withdrawal)}
+                                                        className={`flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[10px] font-semibold border transition-all w-fit disabled:opacity-50 disabled:cursor-not-allowed ${
+                                                            withdrawal.comprovanteVisivel === false
+                                                                ? "bg-gray-100 border-gray-300 text-gray-500 hover:bg-gray-200"
+                                                                : "bg-emerald-50 border-emerald-300 text-emerald-700 hover:bg-emerald-100"
+                                                        }`}
+                                                        title={withdrawal.comprovanteVisivel === false ? "Oculto para cliente — clique para exibir" : "Visível para cliente — clique para ocultar"}
+                                                    >
+                                                        {withdrawal.comprovanteVisivel === false
+                                                            ? <><EyeOff className="w-2.5 h-2.5" /> Oculto</>
+                                                            : <><Eye className="w-2.5 h-2.5" /> Visível</>
+                                                        }
+                                                    </button>
+                                                </div>
                                             </td>
                                         </tr>
                                     ))}
@@ -839,6 +924,51 @@ const WithdrawPage = () => {
                             className="w-full"
                         >
                             Entendi
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* Modal de Upload/Troca de Comprovante */}
+            <Dialog open={isUploadReceiptOpen} onOpenChange={(open) => { if (!open) { setIsUploadReceiptOpen(false); setUploadReceiptFile(null); } }}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle className="flex items-center gap-2">
+                            <Upload className="w-5 h-5 text-violet-600" />
+                            {selectedUploadWithdrawal?.receiptImage ? "Trocar comprovante" : "Adicionar comprovante"}
+                        </DialogTitle>
+                    </DialogHeader>
+                    <div className="grid gap-4 py-4">
+                        <p className="text-sm text-gray-600">
+                            Selecione a imagem do comprovante. Ela ficará disponível para o cliente visualizar.
+                        </p>
+                        <label className={`flex flex-col items-center justify-center h-36 w-full cursor-pointer rounded-xl border-2 border-dashed transition-all ${uploadReceiptFile ? "border-emerald-400 bg-emerald-50" : "border-gray-300 bg-gray-50 hover:border-violet-400 hover:bg-violet-50"}`}>
+                            <input type="file" className="hidden" accept="image/*,.pdf"
+                                onChange={(e) => { if (e.target.files?.[0]) setUploadReceiptFile(e.target.files[0]); }} />
+                            {uploadReceiptFile ? (
+                                <div className="flex flex-col items-center gap-2">
+                                    <FileText className="w-8 h-8 text-emerald-600" />
+                                    <span className="text-sm font-medium text-gray-800 max-w-[200px] truncate">{uploadReceiptFile.name}</span>
+                                    <span className="text-xs text-gray-500">Clique para trocar</span>
+                                </div>
+                            ) : (
+                                <div className="flex flex-col items-center gap-2">
+                                    <Upload className="w-8 h-8 text-gray-400" />
+                                    <span className="text-sm text-gray-600">Clique para selecionar</span>
+                                    <span className="text-xs text-gray-400">PNG, JPG ou PDF</span>
+                                </div>
+                            )}
+                        </label>
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => { setIsUploadReceiptOpen(false); setUploadReceiptFile(null); }} disabled={isUploadingReceipt}>
+                            Cancelar
+                        </Button>
+                        <Button onClick={handleUploadReceipt} disabled={!uploadReceiptFile || isUploadingReceipt}
+                            className="bg-violet-600 hover:bg-violet-700 text-white">
+                            {isUploadingReceipt ? (
+                                <><RefreshCw className="w-4 h-4 mr-2 animate-spin" />Salvando...</>
+                            ) : "Salvar"}
                         </Button>
                     </DialogFooter>
                 </DialogContent>
