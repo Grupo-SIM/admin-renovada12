@@ -9,8 +9,9 @@ export function ThemeToggle() {
     const saved = localStorage.getItem("admin-theme");
     const isDark =
       saved === "dark" ||
-      (!saved && window.matchMedia("(prefers-color-scheme: dark)").matches);
+      (saved === null && window.matchMedia("(prefers-color-scheme: dark)").matches);
     setDark(isDark);
+    document.documentElement.classList.toggle("dark", isDark);
   }, []);
 
   const toggle = () => {
