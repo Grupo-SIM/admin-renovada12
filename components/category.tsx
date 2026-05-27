@@ -79,10 +79,10 @@ export default function CategoriesPage() {
 
       {isLoading ? (
         <div className="flex justify-center items-center h-40">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" />
+          <div className="animate-spin rounded-full h-8 w-8 border-2 border-black/20 dark:border-white/20 border-t-black dark:border-t-white" />
         </div>
       ) : (
-        <div className="bg-white rounded-lg shadow">
+        <div className="rounded-xl border border-black/[0.08] dark:border-white/[0.08] bg-white/60 dark:bg-white/[0.04] backdrop-blur-xl overflow-hidden">
           <Table>
             <TableHeader>
               <TableRow>
@@ -127,7 +127,7 @@ export default function CategoriesPage() {
                 <TableRow>
                   <TableCell
                     colSpan={4}
-                    className="text-center py-8 text-gray-500"
+                    className="text-center py-8 text-black/40 dark:text-white/40"
                   >
                     Nenhuma categoria encontrada
                   </TableCell>

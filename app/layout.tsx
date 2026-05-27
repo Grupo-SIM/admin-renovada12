@@ -29,13 +29,24 @@ export default function RootLayout({
 }>) {
 
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
+      <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){var t=localStorage.getItem('admin-theme');if(t==='dark')document.documentElement.classList.add('dark')})()`,
+          }}
+        />
+      </head>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
         suppressHydrationWarning
       >
         {children}
-        <ToastContainer />
+        <ToastContainer
+          theme="colored"
+          position="bottom-right"
+          toastClassName="!rounded-xl !text-sm"
+        />
       </body>
     </html>
   );

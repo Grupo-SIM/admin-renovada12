@@ -22,26 +22,19 @@ import { Badge } from "@/components/ui/global";
 import { Plus, Pencil, Trash2, X } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
-const getTranslation = (role: string) => {
-  switch (role) {
-    case "admin":
-      return "Administrador";
-    case "pray":
-      return "Oracão";
-    case "video":
-      return "Vídeo";
-    case "study":
-      return "Estudos";
-    case "schedule":
-      return "Agenda";
-    case "donate":
-      return "Contribuiçoes";
-    case "quiz":
-      return "Quiz";
-    default:
-      return role;
-  }
+const roleConfig: Record<string, { label: string; cls: string }> = {
+  admin:    { label: "Administrador", cls: "bg-violet-500/10 text-violet-700 dark:text-violet-400 border border-violet-500/20" },
+  pray:     { label: "Oração",        cls: "bg-blue-500/10 text-blue-700 dark:text-blue-400 border border-blue-500/20" },
+  video:    { label: "Vídeo",         cls: "bg-rose-500/10 text-rose-700 dark:text-rose-400 border border-rose-500/20" },
+  study:    { label: "Estudos",       cls: "bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20" },
+  schedule: { label: "Agenda",        cls: "bg-cyan-500/10 text-cyan-700 dark:text-cyan-400 border border-cyan-500/20" },
+  donate:   { label: "Contribuições", cls: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20" },
+  quiz:     { label: "Quiz",          cls: "bg-orange-500/10 text-orange-700 dark:text-orange-400 border border-orange-500/20" },
 };
+
+const getTranslation = (role: string) => roleConfig[role]?.label ?? role;
+const getRoleCls = (role: string) =>
+  roleConfig[role]?.cls ?? "bg-black/[0.06] dark:bg-white/[0.06] text-black/60 dark:text-white/60 border border-black/10 dark:border-white/10";
 interface User {
   id: string;
   password?: string;
@@ -202,18 +195,16 @@ const UserModal = ({
               )}
               <div className="flex flex-wrap gap-2 mt-2">
                 {roles.map((role) => (
-                  <Badge key={role} variant="secondary" className="p-1">
+                  <span key={role} className={`inline-flex items-center rounded-md pl-2 pr-1 py-0.5 text-xs font-medium backdrop-blur-sm ${getRoleCls(role)}`}>
                     {getTranslation(role)}
-                    <Button
+                    <button
                       type="button"
-                      variant="ghost"
-                      size="icon"
-                      className="h-4 w-4 ml-1 hover:bg-transparent"
+                      className="ml-1 hover:opacity-70 transition-opacity"
                       onClick={() => handleRoleRemove(role)}
                     >
                       <X className="h-3 w-3" />
-                    </Button>
-                  </Badge>
+                    </button>
+                  </span>
                 ))}
               </div>
             </div>
@@ -376,7 +367,7 @@ const UserPage = () => {
 
       {isLoading ? (
         <div className="flex justify-center items-center h-40">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" />
+          <div className="animate-spin rounded-full h-8 w-8 border-2 border-black/20 dark:border-white/20 border-t-black dark:border-t-white" />
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -385,12 +376,12 @@ const UserPage = () => {
               <CardContent className="p-6">
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
-                    <p className="text-sm text-gray-500 mb-3">{user.email}</p>
+                    <p className="text-sm text-black/60 dark:text-white/60 mb-3">{user.email}</p>
                     <div className="flex flex-wrap gap-2">
                       {user.roles.map((role) => (
-                        <Badge key={role} variant="secondary">
+                        <span key={role} className={`inline-flex items-center rounded-md px-2 py-0.5 text-xs font-medium backdrop-blur-sm ${getRoleCls(role)}`}>
                           {getTranslation(role)}
-                        </Badge>
+                        </span>
                       ))}
                     </div>
                   </div>

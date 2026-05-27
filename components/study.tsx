@@ -15,6 +15,13 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   DragDropContext,
   Droppable,
   Draggable,
@@ -280,19 +287,22 @@ const StudyModal = ({
         <form onSubmit={handleSubmit} className="space-y-6">
           <div>
             <Label htmlFor="category">Categoria</Label>
-            <select
-              id="category"
+            <Select
               value={categoryId}
-              onChange={(e) => setCategoryId(e.target.value)}
-              className="w-full px-3 py-2 border rounded-md"
+              onValueChange={setCategoryId}
               required
             >
-              {categories.map((category) => (
-                <option key={category.id} value={category.id}>
-                  {category.name}
-                </option>
-              ))}
-            </select>
+              <SelectTrigger id="category" className="w-full">
+                <SelectValue placeholder="Selecione uma categoria" />
+              </SelectTrigger>
+              <SelectContent>
+                {categories.map((category) => (
+                  <SelectItem key={category.id} value={category.id}>
+                    {category.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
           <div>
             <Label htmlFor="title">Título</Label>
@@ -698,30 +708,31 @@ const CategorizedStudiesPage = () => {
       {/* Estudos com drag-and-drop */}
       {selectedCategory && (
         <div>
-          <div className="flex justify-between items-center mb-6">
+          <div className="flex justify-between items-center">
             <div className="flex items-center gap-3">
               <h2 className="text-2xl font-bold">
                 Estudos —{" "}
                 {categories.find((c) => c.id === selectedCategory)?.name}
               </h2>
               {isSavingOrder && (
-                <span className="text-sm text-gray-400 flex items-center gap-1">
-                  <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-gray-400" />
+                <span className="text-sm text-black/40 dark:text-white/40 flex items-center gap-1">
+                  <div className="animate-spin rounded-full h-3 w-3 border-2 border-black/20 dark:border-white/20 border-t-black dark:border-t-white" />
                   Salvando ordem...
                 </span>
               )}
             </div>
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-gray-400">
-                Arraste os cards para reordenar
-              </span>
-              <Button
-                onClick={() => setStudyModal({ isOpen: true, mode: "create" })}
-              >
-                <Plus className="w-4 h-4 mr-2" />
-                Novo Estudo
-              </Button>
-            </div>
+            <Button
+              onClick={() => setStudyModal({ isOpen: true, mode: "create" })}
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              Novo Estudo
+            </Button>
+          </div>
+          <div className="mb-6 mt-2">
+            <span className="inline-flex items-center gap-1.5 text-xs text-black/40 dark:text-white/40 bg-black/[0.04] dark:bg-white/[0.04] border border-black/[0.06] dark:border-white/[0.06] rounded-md px-2.5 py-1 select-none">
+              <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="5 9 2 12 5 15"/><polyline points="9 5 12 2 15 5"/><polyline points="15 19 12 22 9 19"/><polyline points="19 9 22 12 19 15"/><line x1="2" y1="12" x2="22" y2="12"/><line x1="12" y1="2" x2="12" y2="22"/></svg>
+              Arraste para reordenar
+            </span>
           </div>
 
           {isLoading ? (

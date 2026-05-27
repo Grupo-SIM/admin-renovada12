@@ -4,13 +4,6 @@ import { Button } from "@/components/ui/global";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/global";
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from "@/components/ui/dialog";
-import {
   Tabs,
   TabsList,
   TabsTrigger,
@@ -31,18 +24,17 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Badge } from "@/components/ui/global";
 import {
-  DollarSign,
-  ArrowUpRight,
-  ArrowDownLeft,
   ChevronLeft,
   ChevronRight,
   Download,
+  Info,
 } from "lucide-react";
-import { toast } from 'react-toastify';
+import { toast } from "react-toastify";
 import { jsonToExcel } from "@/services/excel";
-import { MACHINE_API_URL, INTERNAL_API_URL, RENOVADA_USER_ID } from "@/constants/api";
+import { INTERNAL_API_URL, RENOVADA_USER_ID } from "@/constants/api";
+import { DatePicker } from "@/components/ui/date-picker";
+import { format } from "date-fns";
 
 interface Transaction {
   id: string;
@@ -63,13 +55,6 @@ interface Transaction {
   updatedAt: string;
 }
 
-
-interface FinancialSummary {
-  availableBalance: number;
-  pendingWithdraws: number;
-  lockedBalance: number;
-}
-
 interface PaginationMeta {
   currentPage: number;
   itemsPerPage: number;
@@ -82,9 +67,39 @@ interface TransactionResponse {
   meta: PaginationMeta;
 }
 
+// ─── Status badge (glass translucent, rounded-md) ──────────────────────────
+const statusBadge: Record<string, string> = {
+  PENDING:
+    "bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20 backdrop-blur-sm",
+  COMPLETED:
+    "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20 backdrop-blur-sm",
+  APPROVED:
+    "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20 backdrop-blur-sm",
+  FAILED:
+    "bg-red-500/10 text-red-700 dark:text-red-400 border border-red-500/20 backdrop-blur-sm",
+  PROCESSING:
+    "bg-blue-500/10 text-blue-700 dark:text-blue-400 border border-blue-500/20 backdrop-blur-sm",
+};
+
+const getStatusBadge = (status: string) =>
+  statusBadge[status] ||
+  "bg-black/[0.06] dark:bg-white/[0.06] text-black/50 dark:text-white/50 border border-black/10 dark:border-white/10 backdrop-blur-sm";
+
+const statusLabel: Record<string, string> = {
+  PENDING: "Pendente",
+  COMPLETED: "Completado",
+  APPROVED: "Aprovado",
+  FAILED: "Falhou",
+  PROCESSING: "Processando",
+};
+
+// ─── Helpers ───────────────────────────────────────────────────────────────
 const stripInternalTags = (description?: string | null) => {
   if (!description) return "";
-  return description.replace(/\[TENANT:[^\]]+\]/gi, "").replace(/\[CPF_DONO:[^\]]+\]/gi, "").trim();
+  return description
+    .replace(/\[TENANT:[^\]]+\]/gi, "")
+    .replace(/\[CPF_DONO:[^\]]+\]/gi, "")
+    .trim();
 };
 
 const getLocalDateString = (dateInput: string | Date) => {
@@ -92,71 +107,34 @@ const getLocalDateString = (dateInput: string | Date) => {
     const date = new Date(dateInput);
     if (isNaN(date.getTime())) return "";
     const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
     return `${year}-${month}-${day}`;
   } catch {
     return "";
   }
 };
 
-const formatCPFCNPJ = (value: string) => {
-  const numbersOnly = value.replace(/\D/g, "");
-
-  if (numbersOnly.length <= 11) {
-    return numbersOnly
-      .replace(/(\d{3})(\d)/, "$1.$2")
-      .replace(/(\d{3})(\d)/, "$1.$2")
-      .replace(/(\d{3})(\d{1,2})$/, "$1-$2");
-  } else {
-    return numbersOnly
-      .replace(/^(\d{2})(\d)/, "$1.$2")
-      .replace(/^(\d{2})\.(\d{3})(\d)/, "$1.$2.$3")
-      .replace(/\.(\d{3})(\d)/, ".$1/$2")
-      .replace(/(\d{4})(\d)/, "$1-$2");
-  }
-};
-
-const getStatusColor = (status: string) => {
-  const statusColors: any = {
-    PENDING: "bg-yellow-100 text-yellow-800",
-    COMPLETED: "bg-green-100 text-green-800",
-    FAILED: "bg-red-100 text-red-800",
-    PROCESSING: "bg-blue-100 text-blue-800",
-    APPROVED: "bg-green-100 text-green-800",
-  };
-  return statusColors[status] || "bg-gray-100 text-gray-800";
-};
-
-const formatCurrency = (value: number) => {
-  return new Intl.NumberFormat("pt-BR", {
+const formatCurrency = (value: number) =>
+  new Intl.NumberFormat("pt-BR", {
     style: "currency",
     currency: "BRL",
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   }).format(value);
-};
 
-const getFeriados = async () => {
-  const ano = new Date().getFullYear();
-  try {
-    const response = await fetch(`https://brasilapi.com.br/api/feriados/v1/${ano}`);
-    const data = await response.json();
-    return data.map((feriado: any) => ({
-      date: feriado.date,
-      name: feriado.name
-    }));
-  } catch (error) {
-    console.error('Erro ao buscar feriados:', error);
-    return [];
+const getTranslatedPaymentMethod = (paymentMethod: string) => {
+  switch (paymentMethod) {
+    case "PIX":
+      return "PIX";
+    case "CREDIT_CARD":
+      return "Cartão de Crédito/Débito";
+    default:
+      return paymentMethod;
   }
 };
 
-const isWeekend = (date: Date) => {
-  const day = date.getDay();
-  return day === 0 || day === 6; // 0 = domingo, 6 = sábado
-};
-
+// ─── Main Component ────────────────────────────────────────────────────────
 const TransactionsPage = () => {
   const [activeTab, setActiveTab] = useState("transactions");
   const [transactions, setTransactions] = useState<Transaction[]>([]);
@@ -165,12 +143,6 @@ const TransactionsPage = () => {
   const [statusFilter, setStatusFilter] = useState("");
   const [description, setDescription] = useState("");
   const [isExporting, setIsExporting] = useState(false);
-  const [financialSummary, setFinancialSummary] = useState<FinancialSummary>({
-    availableBalance: 0,
-    pendingWithdraws: 0,
-    lockedBalance: 0,
-  });
-  const [machinesBalance, setMachinesBalance] = useState(0);
   const [isLoadingBalances, setIsLoadingBalances] = useState(true);
   const [paginationMeta, setPaginationMeta] = useState<PaginationMeta>({
     currentPage: 1,
@@ -180,35 +152,19 @@ const TransactionsPage = () => {
   });
   const [isLoading, setIsLoading] = useState(false);
 
-  const [walletPerDescription, setWalletPerDescription] = useState<{
-    [key: string]: number;
-  }>({
-    oferta: 0,
-    primícia: 0,
-    dizimo: 0,
-    fundação: 0,
-  });
-
-
   const handleExportExcel = async () => {
     setIsExporting(true);
     try {
       let url = `${INTERNAL_API_URL}/renovada/finance/transactions?userId=${RENOVADA_USER_ID}&limit=5000`;
-
       if (startDate) url += `&startDate=${startDate}`;
       if (endDate) url += `&endDate=${endDate}`;
       if (statusFilter && statusFilter !== "ALL") url += `&status=${statusFilter}`;
       if (description && description !== "ALL") url += `&description=${description}`;
 
-      const response = await fetch(url, {
-        headers: {
-          accept: "*/*",
-        },
-      });
-
+      const response = await fetch(url, { headers: { accept: "*/*" } });
       if (!response.ok) throw new Error("Falha ao exportar dados");
       const exportData = await response.json();
-      // Define columns for Excel export
+
       const columns = [
         { header: "Nome", key: "nome", width: 35 },
         { header: "Data", key: "data", width: 15 },
@@ -220,38 +176,30 @@ const TransactionsPage = () => {
         { header: "Método de Pagamento", key: "método de pagamento", width: 15 },
         { header: "Valor Recebido", key: "valor", width: 15 },
       ];
+
       const transactions0 = exportData.transactions ?? exportData;
-      
-      // Strict client-side date filtering to handle timezone shifts
-      const filteredTransactions0 = transactions0.filter((t: any) => {
+      const filtered = transactions0.filter((t: any) => {
         const tDate = getLocalDateString(t.createdAt);
         if (startDate && tDate < startDate) return false;
         if (endDate && tDate > endDate) return false;
         return true;
       });
 
-      // Format data before export
-      const formattedTransactions = filteredTransactions0.map((transaction: any) => ({
-        nome: transaction.name || "",
-        data: new Date(transaction.createdAt).toLocaleDateString("pt-BR"),
-        tipo: stripInternalTags(transaction.description),
-        email: transaction.email || "",
-        "número de telefone": transaction.customer_phone || "",
-        documento: transaction.customer_document || "",
-        "tipo do documento": transaction.customer_document_type || "",
-        "método de pagamento": getTranslatedPaymentMethod(transaction.payment_method),
-        valor: formatCurrency(transaction.amountWithoutAllFee),
+      const formatted = filtered.map((t: any) => ({
+        nome: t.name || "",
+        data: new Date(t.createdAt).toLocaleDateString("pt-BR"),
+        tipo: stripInternalTags(t.description),
+        email: t.email || "",
+        "número de telefone": t.customer_phone || "",
+        documento: t.customer_document || "",
+        "tipo do documento": t.customer_document_type || "",
+        "método de pagamento": getTranslatedPaymentMethod(t.payment_method),
+        valor: formatCurrency(t.amountWithoutAllFee),
       }));
 
-      // Generate and download Excel file
-      jsonToExcel(
-        formattedTransactions,
-        columns,
-        `transacoes-${new Date().toISOString().split("T")[0]}`
-      );
-
+      jsonToExcel(formatted, columns, `transacoes-${new Date().toISOString().split("T")[0]}`);
       toast.success("Arquivo Excel exportado com sucesso!");
-    } catch (error) {
+    } catch {
       toast.error("Não foi possível exportar o arquivo Excel.");
     } finally {
       setIsExporting(false);
@@ -261,150 +209,30 @@ const TransactionsPage = () => {
   useEffect(() => {
     fetchTransactions(1);
     setIsLoadingBalances(true);
-    fetchFinancialSummary();
-    fetchMachinesBalance();
+    setIsLoadingBalances(false);
   }, [activeTab]);
-
-  const fetchFinancialSummary = async () => {
-    try {
-      const response = await fetch(
-        `${INTERNAL_API_URL}/renovada/finance/summary?userId=${RENOVADA_USER_ID}`,
-        {
-          headers: {
-            accept: "*/*",
-            "Content-Type": "application/json",
-          },
-        }
-      );
-      const data = await response.json();
-      setFinancialSummary(data);
-    } catch (error) {
-      toast.error("Não foi possível carregar o resumo financeiro.");
-    }
-  };
-
-  const fetchMachinesBalance = async () => {
-    try {
-      const response = await fetch(`${MACHINE_API_URL}/admin/renovada/machines?limit=100`, {
-        headers: { "Content-Type": "application/json" },
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        const totalMachinesBalance = data.transactions.reduce((sum: number, transaction: any) => sum + transaction.profit_minus_tax, 0);
-        setMachinesBalance(totalMachinesBalance);
-      }
-    } catch (error) {
-      console.error("Erro ao carregar saldo das maquinetas:", error);
-      setMachinesBalance(0);
-    } finally {
-      setIsLoadingBalances(false);
-    }
-  };
 
   const fetchTransactions = async (page = 1) => {
     setIsLoading(true);
     try {
       let url = `${INTERNAL_API_URL}/renovada/finance/transactions?userId=${RENOVADA_USER_ID}&page=${page}&limit=${paginationMeta.itemsPerPage}`;
-
-      if (startDate) {
-        url += `&startDate=${startDate}`;
-      }
-      if (endDate) {
-        url += `&endDate=${endDate}`;
-      }
-      if (statusFilter && statusFilter !== "ALL") {
-        url += `&status=${statusFilter}`;
-      }
-      if (description && description !== "ALL") {
-        url += `&description=${description}`;
-      }
+      if (startDate) url += `&startDate=${startDate}`;
+      if (endDate) url += `&endDate=${endDate}`;
+      if (statusFilter && statusFilter !== "ALL") url += `&status=${statusFilter}`;
+      if (description && description !== "ALL") url += `&description=${description}`;
 
       const response = await fetch(url, {
-        headers: {
-          accept: "*/*",
-          "Content-Type": "application/json",
-        },
+        headers: { accept: "*/*", "Content-Type": "application/json" },
       });
       const data: TransactionResponse = await response.json();
       setTransactions(data.transactions || []);
       setPaginationMeta(data.meta);
-    } catch (error) {
+    } catch {
       toast.error("Não foi possível carregar as transações.");
     } finally {
       setIsLoading(false);
     }
   };
-
-
-
-  const renderSummaryCards = () => (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-     {/*  <Card>
-        <CardContent className="p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-600">
-                Saldo disponível
-              </p>
-              <h3 className="text-2xl font-bold">
-                {isLoadingBalances ? (
-                  <div className="animate-pulse">
-                    <div className="h-8 bg-gray-200 rounded w-32"></div>
-                  </div>
-                ) : (
-                  (() => {
-                    const calculatedBalance = financialSummary.availableBalance - machinesBalance;
-                    const finalBalance = calculatedBalance < 0 ? financialSummary.availableBalance : calculatedBalance;
-                    return formatCurrency(finalBalance);
-                  })()
-                )}
-              </h3>
-            </div>
-            <div className="h-12 w-12 rounded-full bg-green-100 flex items-center justify-center">
-              <DollarSign className="h-6 w-6 text-green-600" />
-            </div>
-          </div>
-        </CardContent>
-      </Card> */}
-
-      {/* <Card>
-        <CardContent className="p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-600">
-                Saque em processo
-              </p>
-              <h3 className="text-2xl font-bold">
-                {formatCurrency(financialSummary.pendingWithdraws)}
-              </h3>
-            </div>
-            <div className="h-12 w-12 rounded-full bg-yellow-100 flex items-center justify-center">
-              <ArrowUpRight className="h-6 w-6 text-yellow-600" />
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardContent className="p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-600">
-                Saldo em processamento
-              </p>
-              <h3 className="text-2xl font-bold">
-                {formatCurrency(financialSummary.lockedBalance)}
-              </h3>
-            </div>
-            <div className="h-12 w-12 rounded-full bg-blue-100 flex items-center justify-center">
-              <ArrowDownLeft className="h-6 w-6 text-blue-600" />
-            </div>
-          </div>
-        </CardContent>
-      </Card> */}
-    </div>
-  );
 
   const renderPagination = (
     currentPage: number,
@@ -413,58 +241,36 @@ const TransactionsPage = () => {
     itemsPerPage: number,
     onPageChange: (page: number) => void
   ) => (
-    <div className="flex items-center justify-between border-t border-gray-200 bg-white px-4 py-3 sm:px-6">
+    <div className="flex items-center justify-between border-t border-black/[0.06] dark:border-white/[0.06] px-4 py-3 sm:px-6">
       <div className="flex flex-1 justify-between sm:hidden">
-        <Button
-          onClick={() => onPageChange(currentPage - 1)}
-          disabled={currentPage === 1}
-          variant="outline"
-          size="sm"
-        >
+        <Button onClick={() => onPageChange(currentPage - 1)} disabled={currentPage === 1} variant="outline" size="sm">
           Anterior
         </Button>
-        <Button
-          onClick={() => onPageChange(currentPage + 1)}
-          disabled={currentPage === totalPages}
-          variant="outline"
-          size="sm"
-        >
+        <Button onClick={() => onPageChange(currentPage + 1)} disabled={currentPage === totalPages} variant="outline" size="sm">
           Próxima
         </Button>
       </div>
       <div className="hidden sm:flex sm:flex-1 sm:items-center sm:justify-between">
-        <div>
-          <p className="text-sm text-gray-700">
-            Mostrando{" "}
-            <span className="font-medium">
-              {(currentPage - 1) * itemsPerPage + 1}
-            </span>{" "}
-            até{" "}
-            <span className="font-medium">
-              {Math.min(currentPage * itemsPerPage, totalItems)}
-            </span>{" "}
-            de <span className="font-medium">{totalItems}</span> resultados
-          </p>
-        </div>
-        <div className="flex items-center space-x-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => onPageChange(currentPage - 1)}
-            disabled={currentPage === 1}
-          >
+        <p className="text-sm text-black/50 dark:text-white/50">
+          Mostrando{" "}
+          <span className="font-medium text-black dark:text-white">
+            {(currentPage - 1) * itemsPerPage + 1}
+          </span>{" "}
+          até{" "}
+          <span className="font-medium text-black dark:text-white">
+            {Math.min(currentPage * itemsPerPage, totalItems)}
+          </span>{" "}
+          de <span className="font-medium text-black dark:text-white">{totalItems}</span> resultados
+        </p>
+        <div className="flex items-center gap-1">
+          <Button variant="outline" size="icon" onClick={() => onPageChange(currentPage - 1)} disabled={currentPage === 1}>
             <ChevronLeft className="h-4 w-4" />
           </Button>
           {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
             let pageNumber = i + 1;
-
             if (currentPage > 3 && totalPages > 5) {
-              pageNumber = Math.max(
-                Math.min(currentPage - 2 + i, totalPages - 4 + i),
-                i + 1
-              );
+              pageNumber = Math.max(Math.min(currentPage - 2 + i, totalPages - 4 + i), i + 1);
             }
-
             return (
               <Button
                 key={pageNumber}
@@ -476,12 +282,7 @@ const TransactionsPage = () => {
               </Button>
             );
           })}
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => onPageChange(currentPage + 1)}
-            disabled={currentPage === totalPages}
-          >
+          <Button variant="outline" size="icon" onClick={() => onPageChange(currentPage + 1)} disabled={currentPage === totalPages}>
             <ChevronRight className="h-4 w-4" />
           </Button>
         </div>
@@ -489,129 +290,53 @@ const TransactionsPage = () => {
     </div>
   );
 
-  const getTranslatedPaymentMethod = (paymentMethod: string) => {
-    switch (paymentMethod) {
-      case "PIX":
-        return "pix";
-      case "CREDIT_CARD":
-        return "Cartão de Crédito/Débito";
-      default:
-        return paymentMethod;
-    }
-  };
-
-  const renderTransactionTable = (data: Transaction[] = []) => (
-    <div className="overflow-auto">
-      <div className="rounded-md border min-w-[800px] lg:min-w-full">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead className="w-[100px] lg:w-auto">Data</TableHead>
-              <TableHead className="w-[100px] lg:w-auto">Tipo</TableHead>
-              <TableHead className="w-[100px] lg:w-auto">Nome</TableHead>
-              <TableHead className="w-[100px] lg:w-auto">Email</TableHead>
-              <TableHead className="w-[120px] lg:w-auto">Metodo de Pagamento</TableHead>
-              <TableHead className="w-[120px] lg:w-auto">
-                Valor Recebido
-              </TableHead>
-              <TableHead className="w-[100px] lg:w-auto">Status</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {data?.map((transaction) => (
-              <TableRow key={transaction.id}>
-                <TableCell className="whitespace-nowrap">
-                  {new Date(transaction.createdAt).toLocaleDateString("pt-BR")}
-                </TableCell>
-                <TableCell className="font-mono text-sm whitespace-nowrap">
-                  {stripInternalTags(transaction?.description)}
-                </TableCell>
-                <TableCell className="font-mono text-sm whitespace-nowrap">
-                  {transaction?.name}
-                </TableCell>
-                <TableCell className="font-mono text-sm whitespace-nowrap">
-                  {transaction?.email}
-                </TableCell>
-                <TableCell className="font-mono text-sm whitespace-nowrap">
-                  {getTranslatedPaymentMethod(transaction?.payment_method)}
-                </TableCell>
-                <TableCell className="whitespace-nowrap">
-                  {formatCurrency(transaction.amountWithoutAllFee)}
-                </TableCell>
-                <TableCell>
-                  <Badge
-                    className={`whitespace-nowrap ${getStatusColor(
-                      transaction.status
-                    )}`}
-                  >
-                    {transaction.status}
-                  </Badge>
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </div>
-      {data && data.length > 0 &&
-        renderPagination(
-          paginationMeta.currentPage,
-          paginationMeta.totalPages,
-          paginationMeta.totalItems,
-          paginationMeta.itemsPerPage,
-          (page) => fetchTransactions(page)
-        )}
-    </div>
-  );
-
+  const displayedTransactions = transactions.filter((t: any) => {
+    const tDate = getLocalDateString(t.createdAt);
+    if (startDate && tDate < startDate) return false;
+    if (endDate && tDate > endDate) return false;
+    return true;
+  });
 
   return (
-    <div className="p-6">
+    <div>
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <div className="w-full bg-blue-50 border border-blue-200 rounded-md p-4 mb-4">
-          <div className="flex items-center">
-            <div className="flex-shrink-0">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-            </div>
-            <div className="ml-3">
-              <p className="text-sm font-medium text-blue-800">
-                Atenção: As solicitações de saque são processadas em até 48 horas apenas em dias úteis.
-              </p>
-            </div>
-          </div>
+        {/* Info banner */}
+        <div className="flex items-start gap-3 rounded-xl border border-black/[0.08] dark:border-white/[0.08] bg-black/[0.03] dark:bg-white/[0.03] p-4 mb-4">
+          <Info className="h-4 w-4 text-black/40 dark:text-white/40 shrink-0 mt-0.5" />
+          <p className="text-sm text-black/60 dark:text-white/60">
+            Atenção: As solicitações de saque são processadas em até 48 horas apenas em dias úteis.
+          </p>
         </div>
-        <div className="flex justify-between items-center mb-6">
+
+        <div className="flex justify-between items-center mb-4">
           <TabsList>
             <TabsTrigger value="transactions">Transações</TabsTrigger>
           </TabsList>
-
         </div>
 
-        <TabsContent value="transactions" className="space-y-6">
+        <TabsContent value="transactions" className="space-y-4">
+          {/* Filters */}
           <Card>
-            <CardContent className="p-6">
-              <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-                <div>
-                  <Label htmlFor="startDate">Data Inicial</Label>
-                  <Input
-                    id="startDate"
-                    type="date"
-                    value={startDate}
-                    onChange={(e) => setStartDate(e.target.value)}
+            <CardContent className="p-4">
+              <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
+                <div className="space-y-1.5">
+                  <Label>Data Inicial</Label>
+                  <DatePicker 
+                    value={startDate ? new Date(`${startDate}T12:00:00`) : undefined} 
+                    onChange={(date) => setStartDate(date ? format(date, "yyyy-MM-dd") : "")} 
+                    placeholder="dd/mm/aaaa"
                   />
                 </div>
-                <div>
-                  <Label htmlFor="endDate">Data Final</Label>
-                  <Input
-                    id="endDate"
-                    type="date"
-                    value={endDate}
-                    onChange={(e) => setEndDate(e.target.value)}
+                <div className="space-y-1.5">
+                  <Label>Data Final</Label>
+                  <DatePicker 
+                    value={endDate ? new Date(`${endDate}T12:00:00`) : undefined} 
+                    onChange={(date) => setEndDate(date ? format(date, "yyyy-MM-dd") : "")} 
+                    placeholder="dd/mm/aaaa"
                   />
                 </div>
-                <div>
-                  <Label htmlFor="status">Status</Label>
+                <div className="space-y-1.5">
+                  <Label>Status</Label>
                   <Select value={statusFilter} onValueChange={setStatusFilter}>
                     <SelectTrigger>
                       <SelectValue placeholder="Todos" />
@@ -624,9 +349,8 @@ const TransactionsPage = () => {
                     </SelectContent>
                   </Select>
                 </div>
-
-                <div>
-                  <Label htmlFor="status">Tipo</Label>
+                <div className="space-y-1.5">
+                  <Label>Tipo</Label>
                   <Select value={description} onValueChange={setDescription}>
                     <SelectTrigger>
                       <SelectValue placeholder="Todos" />
@@ -634,36 +358,26 @@ const TransactionsPage = () => {
                     <SelectContent>
                       <SelectItem value="ALL">Todos</SelectItem>
                       <SelectItem value="fundação">Fundação</SelectItem>
-                      <SelectItem value="dizimo">Dizimo</SelectItem>
+                      <SelectItem value="dizimo">Dízimo</SelectItem>
                       <SelectItem value="oferta">Oferta</SelectItem>
                       <SelectItem value="primícia">Primícia</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
-                <div className="flex items-end">
-                  <Button
-                    onClick={() => fetchTransactions(1)}
-                    variant="outline"
-                    className="w-full"
-                  >
+                <div className="flex items-end gap-2">
+                  <Button onClick={() => fetchTransactions(1)} variant="outline" className="flex-1">
                     Filtrar
                   </Button>
-                </div>
-                <div className="flex items-end">
-                  <Button
-                    onClick={handleExportExcel}
-                    disabled={isExporting}
-                    className="w-full bg-blue-600 hover:bg-blue-700 text-white"
-                  >
+                  <Button onClick={handleExportExcel} disabled={isExporting} className="flex-1">
                     {isExporting ? (
                       <>
-                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
+                        <div className="animate-spin rounded-full h-4 w-4 border-2 border-white/30 border-t-white mr-2" />
                         Exportando...
                       </>
                     ) : (
                       <>
                         <Download className="mr-2 h-4 w-4" />
-                        Exportar Excel
+                        Exportar
                       </>
                     )}
                   </Button>
@@ -672,23 +386,70 @@ const TransactionsPage = () => {
             </CardContent>
           </Card>
 
-          {renderSummaryCards()}
+          {/* Table */}
           {isLoading ? (
             <div className="flex justify-center items-center h-40">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" />
+              <div className="animate-spin rounded-full h-6 w-6 border-2 border-black/20 dark:border-white/20 border-t-black dark:border-t-white" />
             </div>
           ) : (
-            renderTransactionTable(
-              transactions.filter((t: any) => {
-                const tDate = getLocalDateString(t.createdAt);
-                if (startDate && tDate < startDate) return false;
-                if (endDate && tDate > endDate) return false;
-                return true;
-              })
-            )
+            <Card className="overflow-hidden">
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Data</TableHead>
+                      <TableHead>Tipo</TableHead>
+                      <TableHead>Nome</TableHead>
+                      <TableHead>Email</TableHead>
+                      <TableHead>Pagamento</TableHead>
+                      <TableHead>Valor Recebido</TableHead>
+                      <TableHead>Status</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {displayedTransactions.map((transaction) => (
+                      <TableRow key={transaction.id}>
+                        <TableCell className="whitespace-nowrap text-black/60 dark:text-white/60 text-xs">
+                          {new Date(transaction.createdAt).toLocaleDateString("pt-BR")}
+                        </TableCell>
+                        <TableCell className="text-sm whitespace-nowrap">
+                          {stripInternalTags(transaction?.description)}
+                        </TableCell>
+                        <TableCell className="text-sm whitespace-nowrap">
+                          {transaction?.name}
+                        </TableCell>
+                        <TableCell className="text-sm whitespace-nowrap text-black/60 dark:text-white/60">
+                          {transaction?.email}
+                        </TableCell>
+                        <TableCell className="text-sm whitespace-nowrap">
+                          {getTranslatedPaymentMethod(transaction?.payment_method)}
+                        </TableCell>
+                        <TableCell className="whitespace-nowrap font-medium">
+                          {formatCurrency(transaction.amountWithoutAllFee)}
+                        </TableCell>
+                        <TableCell>
+                          <span
+                            className={`inline-flex items-center rounded-md px-2 py-0.5 text-xs font-medium ${getStatusBadge(transaction.status)}`}
+                          >
+                            {statusLabel[transaction.status] ?? transaction.status}
+                          </span>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+              {displayedTransactions.length > 0 &&
+                renderPagination(
+                  paginationMeta.currentPage,
+                  paginationMeta.totalPages,
+                  paginationMeta.totalItems,
+                  paginationMeta.itemsPerPage,
+                  (page) => fetchTransactions(page)
+                )}
+            </Card>
           )}
         </TabsContent>
-
       </Tabs>
     </div>
   );

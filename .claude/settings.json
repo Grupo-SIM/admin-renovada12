@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//c/Users/breno/Desktop/JB/front-ebook/**)",
+      "Bash(Get-ChildItem -Recurse -Path \"C:\\\\Users\\\\breno\\\\Desktop\\\\JB\\\\front-ebook\" -Filter \"*login*\" -ErrorAction SilentlyContinue)",
+      "Bash(Select-Object -ExpandProperty FullName)",
+      "PowerShell(head -30)",
+      "PowerShell(Invoke-WebRequest -Uri \"http://localhost:3000/29256.jpg\" -Method Head -TimeoutSec 5)",
+      "Bash(cd \"C:\\\\Users\\\\breno\\\\Desktop\\\\JB\\\\admin-ebook\" && pwd && ls -la)",
+      "Read(//c/Users/breno/Desktop/JB/admin-ebook/**)",
+      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\breno\\\\Desktop\\\\JB\\\\admin-renovada12\" -Force)",
+      "Bash(Select-Object Name, FullName)",
+      "Bash(grep -E \"\\\\.tsx$\")"
+    ]
+  }
+}

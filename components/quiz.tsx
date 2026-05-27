@@ -204,7 +204,7 @@ interface QuizModalProps {
                       type="button"
                       variant="ghost"
                       size="icon"
-                      className={`h-9 w-9 ${option === correctAnswer ? 'text-green-600 hover:text-green-700' : 'text-gray-400 hover:text-gray-500'}`}
+                      className={`h-9 w-9 ${option === correctAnswer ? 'text-emerald-600 dark:text-emerald-400' : 'text-black/30 dark:text-white/30 hover:text-black/60 dark:hover:text-white/60'}`}
                       onClick={() => selectCorrectAnswer(option)}
                       disabled={!option.trim()}
                     >
@@ -414,7 +414,7 @@ const QuizPage = () => {
 
       {isLoading ? (
         <div className="flex justify-center items-center h-40">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" />
+          <div className="animate-spin rounded-full h-8 w-8 border-2 border-black/20 dark:border-white/20 border-t-black dark:border-t-white" />
         </div>
       ) : (
         <>
@@ -429,12 +429,12 @@ const QuizPage = () => {
                       </h3>
                       <div className="space-y-2">
                         {quiz.options.map((option, index) => (
-                          <p key={index} className="text-gray-600">
+                          <p key={index} className="text-black/70 dark:text-white/70">
                             {index + 1}. {option}
                           </p>
                         ))}
                       </div>
-                      <p className="mt-4 text-sm text-gray-500">
+                      <p className="mt-4 text-sm text-black/50 dark:text-white/50">
                         Referência: {quiz.bibleReference}
                       </p>
                     </div>

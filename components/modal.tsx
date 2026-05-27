@@ -177,7 +177,7 @@ const VideoModal: React.FC<VideoModalProps> = ({
       return (
         <Button variant="default" className="gap-2">
           <Plus size={16} />
-          Add Video
+          Adicionar Vídeo
         </Button>
       );
     } else if (mode === "delete") {
@@ -196,9 +196,9 @@ const VideoModal: React.FC<VideoModalProps> = ({
   };
 
   const renderTitle = (): string => {
-    if (mode === "create") return "Add New Video";
-    if (mode === "delete") return "Delete Video";
-    return "Edit Video";
+    if (mode === "create") return "Adicionar Novo Vídeo";
+    if (mode === "delete") return "Deletar Vídeo";
+    return "Editar Vídeo";
   };
 
   const renderContent = (): JSX.Element => {
@@ -233,7 +233,7 @@ const VideoModal: React.FC<VideoModalProps> = ({
                 name="title"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Title</FormLabel>
+                    <FormLabel>Título</FormLabel>
                     <FormControl>
                       <Input {...field} />
                     </FormControl>
@@ -247,7 +247,7 @@ const VideoModal: React.FC<VideoModalProps> = ({
                 name="videoId"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>YouTube Video ID</FormLabel>
+                    <FormLabel>ID do vídeo no YouTube</FormLabel>
                     <FormControl>
                       <Input {...field} />
                     </FormControl>
@@ -261,7 +261,7 @@ const VideoModal: React.FC<VideoModalProps> = ({
                 name="categoryVideoId"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Video Type</FormLabel>
+                    <FormLabel>Tipo de vídeo</FormLabel>
                     <Select
                       onValueChange={field.onChange}
                       defaultValue={field.value}
@@ -292,10 +292,10 @@ const VideoModal: React.FC<VideoModalProps> = ({
               variant="outline"
               onClick={() => setOpen(false)}
             >
-              Cancel
+              Cancelar
             </Button>
             <Button type="submit" disabled={loading}>
-              {loading ? "Saving..." : "Save"}
+              {loading ? "Salvando..." : "Salvar"}
             </Button>
           </div>
         </form>
