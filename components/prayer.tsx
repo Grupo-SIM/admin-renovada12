@@ -503,7 +503,7 @@ const AdminDashboard = () => {
       </Card>
 
       {/* Table card */}
-      <Card>
+      <Card className="mt-6">
         <CardHeader className="flex flex-col sm:flex-row items-start sm:items-center justify-between space-y-2 sm:space-y-0">
           <CardTitle className="text-base">Pedidos de Oração ({filteredRequests.length})</CardTitle>
           <div className="flex gap-2 w-full sm:w-auto">
