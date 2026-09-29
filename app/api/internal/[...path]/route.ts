@@ -13,6 +13,7 @@ export async function GET(
   const url = `${MACHINE_API_URL}/internal/${path}${search}`;
 
   const response = await fetch(url, {
+    cache: 'no-store',
     headers: {
       'x-internal-token': INTERNAL_TOKEN,
       'Content-Type': 'application/json',

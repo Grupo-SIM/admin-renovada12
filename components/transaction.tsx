@@ -29,6 +29,7 @@ import {
   ChevronRight,
   Download,
   Info,
+  RefreshCw,
 } from "lucide-react";
 import { toast } from "react-toastify";
 import { jsonToExcel } from "@/services/excel";
@@ -212,7 +213,7 @@ const TransactionsPage = () => {
     setIsLoadingBalances(false);
   }, [activeTab]);
 
-  const fetchTransactions = async (page = 1) => {
+  const fetchTransactions = async (page = 1, showSuccess = false) => {
     setIsLoading(true);
     try {
       let url = `${INTERNAL_API_URL}/renovada/finance/transactions?userId=${RENOVADA_USER_ID}&page=${page}&limit=${paginationMeta.itemsPerPage}`;
@@ -223,10 +224,13 @@ const TransactionsPage = () => {
 
       const response = await fetch(url, {
         headers: { accept: "*/*", "Content-Type": "application/json" },
+        cache: "no-store",
       });
+      if (!response.ok) throw new Error("Falha ao carregar transações");
       const data: TransactionResponse = await response.json();
       setTransactions(data.transactions || []);
       setPaginationMeta(data.meta);
+      if (showSuccess) toast.success("Transações recarregadas.");
     } catch {
       toast.error("Não foi possível carregar as transações.");
     } finally {
@@ -312,6 +316,15 @@ const TransactionsPage = () => {
           <TabsList>
             <TabsTrigger value="transactions">Transações</TabsTrigger>
           </TabsList>
+          <Button
+            variant="outline"
+            onClick={() => fetchTransactions(paginationMeta.currentPage, true)}
+            disabled={isLoading}
+            aria-label="Recarregar transações"
+          >
+            <RefreshCw className={`mr-2 h-4 w-4 ${isLoading ? "animate-spin" : ""}`} />
+            Recarregar
+          </Button>
         </div>
 
         <TabsContent value="transactions" className="space-y-4">
