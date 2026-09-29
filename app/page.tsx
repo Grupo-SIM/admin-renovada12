@@ -68,6 +68,12 @@ const LoginPage = () => {
 				{/* Lado Esquerdo: Formulário */}
 				<div className="w-full md:w-1/2 p-8 md:p-16 lg:p-24 flex flex-col justify-center bg-white">
 					<div className="mb-8 text-center">
+						{/* eslint-disable-next-line @next/next/no-img-element */}
+						<img
+							src="/igreja-renovada-logo.png"
+							alt="Igreja Renovada"
+							className="mx-auto mb-6 w-full max-w-[240px] h-auto"
+						/>
 						<h1 className="text-3xl font-bold text-black mb-2">Login</h1>
 						<p className="text-gray-500 text-sm">
 							Entre com seu email e senha para acessar
@@ -136,7 +142,7 @@ const LoginPage = () => {
 
 						<Button
 							type="submit"
-							className="w-full bg-black text-white hover:bg-gray-900 rounded-xl h-11 cursor-pointer font-medium border border-gray-300"
+							className="w-full border border-gray-400 bg-white text-black hover:bg-gray-50 rounded-xl h-11 cursor-pointer font-medium"
 							disabled={isLoading || success}
 						>
 							{success ? (
