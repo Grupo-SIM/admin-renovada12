@@ -24,6 +24,7 @@ jobs:
       - name: Build and publish image
         uses: hyoretsu/gh-actions/containers@main
         with:
+          deploy-branch: master
           image: ${{ github.repository_owner }}/renovada-admin
           password: ${{ secrets.GITHUB_TOKEN }}
           registry: ghcr.io
