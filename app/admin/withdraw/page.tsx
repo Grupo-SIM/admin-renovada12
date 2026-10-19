@@ -106,15 +106,15 @@ const WithdrawPage = () => {
 
     const fetchPlatformFees = async () => {
         try {
-            const response = await fetch(`${MACHINE_API_URL}/admin/plataformas/taxas`);
+            const response = await fetch(`${INTERNAL_API_URL}/renovada/finance/fees`);
             if (!response.ok) return;
             const data = await response.json();
-            const renovada = data?.data?.RENOVADA;
+            const renovada: PlatformFees = data;
             if (renovada) {
                 setPlatformFees({
-                    taxaFixa: renovada.TAXA_SAQUE_FIXA ?? 2,
-                    taxaPercent: renovada.TAXA_SAQUE_PERCENT ?? 0,
-                    saqueMin: renovada.SAQUE_MIN ?? 100,
+                    taxaFixa: renovada.taxaFixa,
+                    taxaPercent: renovada.taxaPercent,
+                    saqueMin: renovada.saqueMin,
                 });
             }
         } catch {}
