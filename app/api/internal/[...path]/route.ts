@@ -8,7 +8,7 @@ async function proxy(request: NextRequest, context: { params: Promise<{ path: st
   const { path } = await context.params;
   const resource = path.join('/');
   const receipt = request.method === 'GET' && /^withdrawals\/[a-zA-Z0-9-]+\/receipt$/.test(resource);
-  const read = request.method === 'GET' && (/^(summary|config|transactions|machines|withdrawals)$/.test(resource) || /^withdrawals\/[a-zA-Z0-9-]+$/.test(resource));
+  const read = request.method === 'GET' && (/^(summary|balance|config|transactions|machines|withdrawals)$/.test(resource) || /^withdrawals\/[a-zA-Z0-9-]+$/.test(resource));
   const write = request.method === 'POST' && resource === 'withdrawals';
   const reconcile = request.method === 'POST' && resource === 'reconcile';
   if (!read && !write && !receipt && !reconcile) return NextResponse.json({ error: 'Rota indisponível.' }, { status: 404 });
