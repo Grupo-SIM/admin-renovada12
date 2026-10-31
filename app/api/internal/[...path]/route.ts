@@ -1,3 +1,4 @@
+import { isSameOrigin } from '@/services/same-origin';
 import { NextRequest, NextResponse } from 'next/server';
 import { authorizeFinance, FINANCE_COOKIE } from '@/services/finance-auth';
 
@@ -13,7 +14,7 @@ async function proxy(request: NextRequest, context: { params: Promise<{ path: st
   if (!read && !write && !receipt && !reconcile) return NextResponse.json({ error: 'Rota indisponível.' }, { status: 404 });
   try { await authorizeFinance(request.cookies.get(FINANCE_COOKIE)?.value); }
   catch { return NextResponse.json({ error: 'Sessão financeira inválida ou autorização indisponível. Entre novamente ou contate o administrador.' }, { status: 403 }); }
-  if ((write || reconcile) && (request.headers.get('origin') !== request.nextUrl.origin || request.headers.get('sec-fetch-site') === 'cross-site')) return NextResponse.json({ error: 'Origem inválida.' }, { status: 403 });
+  if ((write || reconcile) && (!isSameOrigin(request) || request.headers.get('sec-fetch-site') === 'cross-site')) return NextResponse.json({ error: 'Origem inválida.' }, { status: 403 });
   try {
     const base = new URL(process.env.SIMINTPAY_API_URL || 'https://simpay-back.simintermediacoes.com');
     const token = process.env.SIMINTPAY_TOKEN;
