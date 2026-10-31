@@ -8,7 +8,6 @@ services:
       - RENOVADA_ACCESS_TOKEN=${RENOVADA_ACCESS_TOKEN:?required}
       - SIMINTPAY_API_URL=${SIMINTPAY_API_URL:-https://simpay-back.simintermediacoes.com}
       - SIMINTPAY_ALLOWED_HOSTS=${SIMINTPAY_ALLOWED_HOSTS:-simpay-back.simintermediacoes.com}
-      - FINANCE_WITHDRAWALS_ENABLED=${FINANCE_WITHDRAWALS_ENABLED:-false}
       - FINANCE_ALLOWED_ROLES=${FINANCE_ALLOWED_ROLES:-admin,withdraw}
     networks:
       - externa
