@@ -9,7 +9,9 @@ export const setCookie = async (name: string, value: string, days: number) => {
 
 
 export const clearCookie = async () => {
-  const { set } = await cookies();
+  const store = await cookies();
+  store.delete('finance-session');
+  const { set } = store;
   set("token", "token", {
     expires: new Date(new Date().getTime() - 60 * 60 * 23 * 1000),
   });

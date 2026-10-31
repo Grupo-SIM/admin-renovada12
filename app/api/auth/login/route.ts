@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { issueFinanceSession, FINANCE_COOKIE } from '@/services/finance-auth';
 
 export async function POST(request: Request) {
 	const { email, password } = await request.json();
@@ -25,6 +26,9 @@ export async function POST(request: Request) {
 		}
 
 		const response = NextResponse.json({ success: true });
+        if (data.user.id && process.env.FINANCE_SESSION_SECRET) {
+            response.cookies.set(FINANCE_COOKIE, issueFinanceSession(data.token, data.user.id), { maxAge: 8 * 3600, httpOnly: true, sameSite: 'strict', secure: process.env.NODE_ENV === 'production', path: '/' });
+        }
 		const expires = new Date(Date.now() + 23 * 60 * 60 * 1000);
 		response.cookies.set("token", data.token, { expires, httpOnly: true, sameSite: "lax", secure: process.env.NODE_ENV === "production", path: "/" });
 		response.cookies.set("roles", data.user.roles, { expires, sameSite: "lax", secure: process.env.NODE_ENV === "production", path: "/" });

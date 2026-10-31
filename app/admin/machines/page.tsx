@@ -10,7 +10,6 @@ import {
   ChevronRight,
 } from "lucide-react";
 import { DatePicker } from "@/components/ui/date-picker";
-import { MACHINE_API_URL } from "@/constants/api";
 import { jsonToExcel } from "@/services/excel";
 import {
   Card,
@@ -134,10 +133,7 @@ const MachinesPage = () => {
 
   const syncMachinesTransactions = async () => {
     try {
-      await fetch(`${MACHINE_API_URL}/admin/sync/maquinetas`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-      });
+      throw new Error('Sincronização bloqueada: contrato autenticado e escopado de maquinetas ainda indisponível.');
     } catch (err) {
       console.error("Erro na sincronização:", err);
     }
@@ -147,13 +143,7 @@ const MachinesPage = () => {
     try {
       setLoading(true);
       setError(null);
-      const response = await fetch(
-        `${MACHINE_API_URL}/admin/renovada/machines?limit=100`,
-        { headers: { "Content-Type": "application/json" } }
-      );
-      if (!response.ok) throw new Error("Erro ao carregar dados das maquinetas");
-      const result: ApiResponse = await response.json();
-      setData(result);
+      throw new Error('Maquinetas temporariamente indisponíveis: aguardando API autenticada e restrita à Renovada. Nenhum dado foi removido.');
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erro desconhecido");
     } finally {

@@ -33,7 +33,7 @@ import {
 } from "lucide-react";
 import { toast } from "react-toastify";
 import { jsonToExcel } from "@/services/excel";
-import { INTERNAL_API_URL, RENOVADA_USER_ID } from "@/constants/api";
+import { INTERNAL_API_URL } from "@/constants/api";
 import { DatePicker } from "@/components/ui/date-picker";
 import { format } from "date-fns";
 
@@ -136,6 +136,10 @@ const getTranslatedPaymentMethod = (paymentMethod: string) => {
 };
 
 // ─── Main Component ────────────────────────────────────────────────────────
+function normalizeTransactions(value: any): TransactionResponse {
+  if (value.unit !== 'cents' || !Array.isArray(value.data) || !value.meta || ![value.meta.page, value.meta.limit, value.meta.total, value.meta.totalPages].every(Number.isSafeInteger) || !value.data.every((item: any) => [item.amountCents, item.netAmountCents, item.platformFeeCents, item.acquirerFeeCents].every(Number.isSafeInteger))) throw new Error('Contrato financeiro inválido');
+  return { transactions: value.data.map((item: any) => ({ ...item, amount: item.amountCents / 100, amountWithoutAllFee: item.netAmountCents / 100, dom_fee: item.platformFeeCents / 100, fee: item.acquirerFeeCents / 100, payment_method: item.paymentMethod })), meta: { currentPage: value.meta.page, totalPages: value.meta.totalPages, totalItems: value.meta.total, itemsPerPage: value.meta.limit } };
+}
 const TransactionsPage = () => {
   const [activeTab, setActiveTab] = useState("transactions");
   const [transactions, setTransactions] = useState<Transaction[]>([]);
@@ -156,15 +160,20 @@ const TransactionsPage = () => {
   const handleExportExcel = async () => {
     setIsExporting(true);
     try {
-      let url = `${INTERNAL_API_URL}/renovada/finance/transactions?userId=${RENOVADA_USER_ID}&limit=5000`;
+      let url = `${INTERNAL_API_URL}/transactions?limit=100`;
       if (startDate) url += `&startDate=${startDate}`;
       if (endDate) url += `&endDate=${endDate}`;
       if (statusFilter && statusFilter !== "ALL") url += `&status=${statusFilter}`;
-      if (description && description !== "ALL") url += `&description=${description}`;
+      if (description && description !== "ALL") url += `&search=${encodeURIComponent(description)}`;
 
       const response = await fetch(url, { headers: { accept: "*/*" } });
       if (!response.ok) throw new Error("Falha ao exportar dados");
-      const exportData = await response.json();
+      const exportData = normalizeTransactions(await response.json());
+      for (let page = 2; page <= exportData.meta.totalPages; page++) {
+        const next = await fetch(`${url}&page=${page}`, { cache: 'no-store' });
+        if (!next.ok) throw new Error('Exportação incompleta');
+        exportData.transactions.push(...normalizeTransactions(await next.json()).transactions);
+      }
 
       const columns = [
         { header: "Nome", key: "nome", width: 35 },
@@ -179,12 +188,7 @@ const TransactionsPage = () => {
       ];
 
       const transactions0 = exportData.transactions ?? exportData;
-      const filtered = transactions0.filter((t: any) => {
-        const tDate = getLocalDateString(t.createdAt);
-        if (startDate && tDate < startDate) return false;
-        if (endDate && tDate > endDate) return false;
-        return true;
-      });
+      const filtered = transactions0;
 
       const formatted = filtered.map((t: any) => ({
         nome: t.name || "",
@@ -216,18 +220,18 @@ const TransactionsPage = () => {
   const fetchTransactions = async (page = 1, showSuccess = false) => {
     setIsLoading(true);
     try {
-      let url = `${INTERNAL_API_URL}/renovada/finance/transactions?userId=${RENOVADA_USER_ID}&page=${page}&limit=${paginationMeta.itemsPerPage}`;
+      let url = `${INTERNAL_API_URL}/transactions?page=${page}&limit=${paginationMeta.itemsPerPage}`;
       if (startDate) url += `&startDate=${startDate}`;
       if (endDate) url += `&endDate=${endDate}`;
       if (statusFilter && statusFilter !== "ALL") url += `&status=${statusFilter}`;
-      if (description && description !== "ALL") url += `&description=${description}`;
+      if (description && description !== "ALL") url += `&search=${encodeURIComponent(description)}`;
 
       const response = await fetch(url, {
         headers: { accept: "*/*", "Content-Type": "application/json" },
         cache: "no-store",
       });
       if (!response.ok) throw new Error("Falha ao carregar transações");
-      const data: TransactionResponse = await response.json();
+      const data = normalizeTransactions(await response.json());
       setTransactions(data.transactions || []);
       setPaginationMeta(data.meta);
       if (showSuccess) toast.success("Transações recarregadas.");
@@ -294,12 +298,7 @@ const TransactionsPage = () => {
     </div>
   );
 
-  const displayedTransactions = transactions.filter((t: any) => {
-    const tDate = getLocalDateString(t.createdAt);
-    if (startDate && tDate < startDate) return false;
-    if (endDate && tDate > endDate) return false;
-    return true;
-  });
+  const displayedTransactions = transactions;
 
   return (
     <div>
