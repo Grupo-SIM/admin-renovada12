@@ -9,12 +9,7 @@ services:
       - SIMINTPAY_API_URL=${SIMINTPAY_API_URL:-https://simpay-back.simintermediacoes.com}
       - SIMINTPAY_ALLOWED_HOSTS=${SIMINTPAY_ALLOWED_HOSTS:-simpay-back.simintermediacoes.com}
       - FINANCE_WITHDRAWALS_ENABLED=${FINANCE_WITHDRAWALS_ENABLED:-false}
-      - FINANCE_CHURCH_JWT_AUDIENCE=${FINANCE_CHURCH_JWT_AUDIENCE:?required}
-      - FINANCE_CHURCH_JWT_SECRET=${FINANCE_CHURCH_JWT_SECRET:?required}
-      - FINANCE_CHURCH_JWT_ISSUER=${FINANCE_CHURCH_JWT_ISSUER:?required}
-      - FINANCE_SESSION_SECRET=${FINANCE_SESSION_SECRET:?required}
-      - FINANCE_IDENTITY_URL=${FINANCE_IDENTITY_URL:?required}
-      - FINANCE_ALLOWED_ROLES=${FINANCE_ALLOWED_ROLES:?required}
+      - FINANCE_ALLOWED_ROLES=${FINANCE_ALLOWED_ROLES:-admin,withdraw}
     networks:
       - externa
       - interna

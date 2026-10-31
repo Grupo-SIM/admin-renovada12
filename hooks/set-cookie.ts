@@ -1,26 +1,18 @@
 "use server";
 import { cookies } from "next/headers";
+import { authorizeFinance } from '@/services/finance-auth';
+
 export const setCookie = async (name: string, value: string, days: number) => {
-  const { set } = await cookies();
-  set(name, value, {
-    expires: new Date(new Date().getTime() + 60 * 60 * 23 * 1000),
+  if (!["token", "roles"].includes(name)) throw new Error("Cookie não permitido");
+  // Legacy callers can migrate a token only after trusted backend verification.
+  if (name === "token") await authorizeFinance(value);
+  (await cookies()).set(name, value, {
+    maxAge: 23 * 60 * 60, httpOnly: name === "token", sameSite: "lax",
+    secure: process.env.NODE_ENV === "production", path: "/",
   });
 };
-
-
 export const clearCookie = async () => {
   const store = await cookies();
-  store.delete('finance-session');
-  const { set } = store;
-  set("token", "token", {
-    expires: new Date(new Date().getTime() - 60 * 60 * 23 * 1000),
-  });
-  set("roles", "none", {
-    expires: new Date(new Date().getTime() - 60 * 60 * 23 * 1000),
-  });
+  store.delete("token"); store.delete("roles"); store.delete("finance-session");
 };
-
-export const getCookie = async (name: string) => {
-  const { get } = await cookies();
-  return get(name);
-};  
+export const getCookie = async (name: string) => (await cookies()).get(name);
