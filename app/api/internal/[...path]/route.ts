@@ -17,7 +17,7 @@ async function proxy(request: NextRequest, context: { params: Promise<{ path: st
   try {
     const base = new URL(process.env.SIMINTPAY_API_URL || 'https://simpay-back.simintermediacoes.com');
     const hosts = (process.env.SIMINTPAY_ALLOWED_HOSTS || 'simpay-back.simintermediacoes.com').split(',').map(host => host.trim());
-    const token = process.env.RENOVADA_ACCESS_TOKEN;
+    const token = process.env.SIMINTPAY_TOKEN;
     if (base.protocol !== 'https:' || base.username || base.password || base.pathname !== '/' || base.search || base.hash || !hosts.includes(base.host) || !token) throw new Error('Configuration unavailable');
     const url = new URL(`/platforms/RENOVADA/finance/${resource}`, base);
     const queries = !read ? new Set<string>() : resource === 'transactions' ? allowedQueries : resource === 'machines' ? new Set(['page', 'limit', 'startDate', 'endDate']) : resource === 'withdrawals' ? new Set(['page', 'limit', 'status']) : new Set<string>();

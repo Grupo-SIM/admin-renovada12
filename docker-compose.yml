@@ -5,7 +5,7 @@ services:
     environment:
       - NODE_ENV=production
       - API_URL=https://api-renovada.jbmidia.com
-      - RENOVADA_ACCESS_TOKEN=${RENOVADA_ACCESS_TOKEN:?required}
+      - SIMINTPAY_TOKEN=${SIMINTPAY_TOKEN:?required}
       - SIMINTPAY_API_URL=${SIMINTPAY_API_URL:-https://simpay-back.simintermediacoes.com}
       - SIMINTPAY_ALLOWED_HOSTS=${SIMINTPAY_ALLOWED_HOSTS:-simpay-back.simintermediacoes.com}
       - FINANCE_ALLOWED_ROLES=${FINANCE_ALLOWED_ROLES:-admin,withdraw}
