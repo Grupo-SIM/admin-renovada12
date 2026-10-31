@@ -7,7 +7,7 @@ async function proxy(request: NextRequest, context: { params: Promise<{ path: st
   const { path } = await context.params;
   const resource = path.join('/');
   const receipt = request.method === 'GET' && /^withdrawals\/[a-zA-Z0-9-]+\/receipt$/.test(resource);
-  const read = request.method === 'GET' && (/^(summary|config|transactions|withdrawals)$/.test(resource) || /^withdrawals\/[a-zA-Z0-9-]+$/.test(resource));
+  const read = request.method === 'GET' && (/^(summary|config|transactions|machines|withdrawals)$/.test(resource) || /^withdrawals\/[a-zA-Z0-9-]+$/.test(resource));
   const write = request.method === 'POST' && resource === 'withdrawals';
   const reconcile = request.method === 'POST' && resource === 'reconcile';
   if (!read && !write && !receipt && !reconcile) return NextResponse.json({ error: 'Rota indisponível.' }, { status: 404 });
@@ -20,7 +20,7 @@ async function proxy(request: NextRequest, context: { params: Promise<{ path: st
     const token = process.env.RENOVADA_ACCESS_TOKEN;
     if (base.protocol !== 'https:' || base.username || base.password || base.pathname !== '/' || base.search || base.hash || !hosts.includes(base.host) || !token) throw new Error('Configuration unavailable');
     const url = new URL(`/platforms/RENOVADA/finance/${resource}`, base);
-    const queries = !read ? new Set<string>() : resource === 'transactions' ? allowedQueries : resource === 'withdrawals' ? new Set(['page', 'limit', 'status']) : new Set<string>();
+    const queries = !read ? new Set<string>() : resource === 'transactions' ? allowedQueries : resource === 'machines' ? new Set(['page', 'limit', 'startDate', 'endDate']) : resource === 'withdrawals' ? new Set(['page', 'limit', 'status']) : new Set<string>();
     for (const [name, value] of request.nextUrl.searchParams) {
       if (!queries.has(name) || request.nextUrl.searchParams.getAll(name).length !== 1 || ((name === 'page' || name === 'limit') && (!/^[1-9][0-9]*$/.test(value) || !Number.isSafeInteger(Number(value)) || (name === 'limit' && Number(value) > 100))) || value.length > 250) return NextResponse.json({ error: 'Filtro inválido.' }, { status: 400 });
       url.searchParams.set(name, value);

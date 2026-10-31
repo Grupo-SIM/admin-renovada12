@@ -94,6 +94,49 @@ const getStatusBadge = (status: string) =>
     cls: "bg-black/[0.06] dark:bg-white/[0.06] text-black/50 dark:text-white/50 border border-black/10 dark:border-white/10 backdrop-blur-sm",
   };
 
+// ─── Adapter (scoped finance contract -> legacy view-model) ──────────────────
+const statusDetailsLabel: Record<string, string> = {
+  completed: "Aprovado",
+  pending: "Pendente",
+  failed: "Falhou",
+  refunded: "Estornado",
+};
+
+const adaptMachinesResponse = (result: any): ApiResponse => ({
+  transactions: (result?.transactions || []).map((t: any) => ({
+    id: t.id,
+    type_operation: "fisical",
+    created_at: t.createdAt,
+    updated_at: t.updatedAt,
+    cod_external: t.externalId,
+    amount: (t.amountCents || 0) / 100,
+    liquid_amount: (t.netAmountCents || 0) / 100,
+    status: t.status,
+    status_details: statusDetailsLabel[t.status] || t.status,
+    statusDetails: statusDetailsLabel[t.status] || t.status,
+    payment_method: t.paymentMethod,
+    installments: t.installments,
+    card_bin: t.cardBin,
+    card_brand: t.cardBrand,
+    card_code_auth: "",
+    boleto_url: null,
+    boleto_digitable_line: null,
+    pix_qrcode: null,
+    pix_content: null,
+    pix_expire: null,
+    customer_name: t.customerName,
+    customer_document: t.customerDocument ?? null,
+    customer_birthdate: null,
+    customer_email: t.customerEmail ?? null,
+    customer_phone: t.customerPhone ?? null,
+    product_first: t.description,
+    postbackUrl: null,
+    profit_minus_tax: (t.netAmountCents || 0) / 100,
+    terminal: t.terminal || "-",
+  })),
+  meta: result?.meta || { page: 1, limit: 100, total: 0, totalPages: 1 },
+});
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const getPaymentMethodText = (method: string) => {
   switch (method) {
@@ -143,7 +186,10 @@ const MachinesPage = () => {
     try {
       setLoading(true);
       setError(null);
-      throw new Error('Maquinetas temporariamente indisponíveis: aguardando API autenticada e restrita à Renovada. Nenhum dado foi removido.');
+      const response = await fetch("/api/internal/machines?limit=100", { cache: "no-store" });
+      if (!response.ok) throw new Error("Erro ao carregar dados das maquinetas");
+      const result = await response.json();
+      setData(adaptMachinesResponse(result));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erro desconhecido");
     } finally {
