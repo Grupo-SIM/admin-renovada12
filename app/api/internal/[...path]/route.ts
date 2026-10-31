@@ -6,13 +6,15 @@ const allowedQueries = new Set(['page', 'limit', 'status', 'paymentMethod', 'sta
 async function proxy(request: NextRequest, context: { params: Promise<{ path: string[] }> }) {
   const { path } = await context.params;
   const resource = path.join('/');
+  const receipt = request.method === 'GET' && /^withdrawals\/[a-zA-Z0-9-]+\/receipt$/.test(resource);
   const read = request.method === 'GET' && (/^(summary|config|transactions|withdrawals)$/.test(resource) || /^withdrawals\/[a-zA-Z0-9-]+$/.test(resource));
   const write = request.method === 'POST' && resource === 'withdrawals';
-  if (!read && !write) return NextResponse.json({ error: 'Rota indisponível.' }, { status: 404 });
+  const reconcile = request.method === 'POST' && resource === 'reconcile';
+  if (!read && !write && !receipt && !reconcile) return NextResponse.json({ error: 'Rota indisponível.' }, { status: 404 });
   try { await authorizeFinance(request.cookies.get(FINANCE_COOKIE)?.value); }
   catch { return NextResponse.json({ error: 'Sessão financeira inválida ou autorização indisponível. Entre novamente ou contate o administrador.' }, { status: 403 }); }
   if (write && process.env.FINANCE_WITHDRAWALS_ENABLED !== 'true') return NextResponse.json({ error: 'Saques indisponíveis até aprovação da reconciliação financeira.' }, { status: 403 });
-  if (write && request.headers.get('origin') !== request.nextUrl.origin) return NextResponse.json({ error: 'Origem inválida.' }, { status: 403 });
+  if ((write || reconcile) && (request.headers.get('origin') !== request.nextUrl.origin || request.headers.get('sec-fetch-site') === 'cross-site')) return NextResponse.json({ error: 'Origem inválida.' }, { status: 403 });
   try {
     const base = new URL(process.env.SIMINTPAY_API_URL || 'https://simpay-back.simintermediacoes.com');
     const hosts = (process.env.SIMINTPAY_ALLOWED_HOSTS || 'simpay-back.simintermediacoes.com').split(',').map(host => host.trim());
@@ -25,6 +27,7 @@ async function proxy(request: NextRequest, context: { params: Promise<{ path: st
       url.searchParams.set(name, value);
     }
     let body: string | undefined;
+    if (reconcile && (await request.text()).length) return NextResponse.json({ error: 'Solicitação inválida.' }, { status: 400 });
     if (write) {
       const value = await request.json();
       if (!Number.isSafeInteger(value.amountCents) || value.amountCents <= 0 || typeof value.pixKey !== 'string' || !value.pixKey.trim() || value.pixKey.length > 200 || typeof value.idempotencyKey !== 'string' || !/^[a-zA-Z0-9-]{16,100}$/.test(value.idempotencyKey) || Object.keys(value).some(name => !['amountCents', 'pixKey', 'idempotencyKey'].includes(name))) return NextResponse.json({ error: 'Dados de saque inválidos.' }, { status: 400 });
@@ -32,6 +35,11 @@ async function proxy(request: NextRequest, context: { params: Promise<{ path: st
     }
     const upstream = await fetch(url, { method: request.method, headers: { 'x-access-token': token, 'Content-Type': 'application/json' }, body, cache: 'no-store', redirect: 'error', signal: AbortSignal.timeout(15000) });
     if (!upstream.ok) return NextResponse.json({ error: 'Operação financeira recusada. Atualize os dados antes de tentar novamente.' }, { status: upstream.status });
+    if (receipt) {
+      const type = upstream.headers.get('content-type')?.split(';')[0];
+      if (!type || !['image/png', 'image/jpeg', 'image/webp', 'application/pdf'].includes(type)) return NextResponse.json({ error: 'Comprovante inválido.' }, { status: 502 });
+      return new NextResponse(upstream.body, { headers: { 'Cache-Control': 'no-store', 'Content-Type': type, 'X-Content-Type-Options': 'nosniff', 'Content-Security-Policy': "default-src 'none'" } });
+    }
     const data = await upstream.json();
     return NextResponse.json(resource === 'config' ? { ...data, withdrawalsEnabled: process.env.FINANCE_WITHDRAWALS_ENABLED === 'true' } : data, { headers: { 'Cache-Control': 'no-store' } });
   } catch { return NextResponse.json({ error: 'Serviço financeiro indisponível.' }, { status: 503 }); }
