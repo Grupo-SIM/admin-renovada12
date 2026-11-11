@@ -135,10 +135,17 @@ const getTranslatedPaymentMethod = (paymentMethod: string) => {
   }
 };
 
+const getDocumentType = (document?: string | null) => {
+  const digits = (document ?? "").replace(/\D/g, "");
+  if (digits.length === 11) return "CPF";
+  if (digits.length === 14) return "CNPJ";
+  return "";
+};
+
 // ─── Main Component ────────────────────────────────────────────────────────
 function normalizeTransactions(value: any): TransactionResponse {
   if (value.unit !== 'cents' || !Array.isArray(value.data) || !value.meta || ![value.meta.page, value.meta.limit, value.meta.total, value.meta.totalPages].every(Number.isSafeInteger) || !value.data.every((item: any) => [item.amountCents, item.netAmountCents, item.platformFeeCents, item.acquirerFeeCents].every(Number.isSafeInteger))) throw new Error('Contrato financeiro inválido');
-  return { transactions: value.data.map((item: any) => ({ ...item, amount: item.amountCents / 100, amountWithoutAllFee: item.netAmountCents / 100, dom_fee: item.platformFeeCents / 100, fee: item.acquirerFeeCents / 100, payment_method: item.paymentMethod })), meta: { currentPage: value.meta.page, totalPages: value.meta.totalPages, totalItems: value.meta.total, itemsPerPage: value.meta.limit } };
+  return { transactions: value.data.map((item: any) => ({ ...item, amount: item.amountCents / 100, amountWithoutAllFee: item.netAmountCents / 100, dom_fee: item.platformFeeCents / 100, fee: item.acquirerFeeCents / 100, payment_method: item.paymentMethod, name: item.customerName ?? undefined, email: item.customerEmail ?? undefined, customer_phone: item.customerPhone ?? undefined, customer_document: item.customerDocument ?? undefined, customer_document_type: getDocumentType(item.customerDocument) })), meta: { currentPage: value.meta.page, totalPages: value.meta.totalPages, totalItems: value.meta.total, itemsPerPage: value.meta.limit } };
 }
 const TransactionsPage = () => {
   const [activeTab, setActiveTab] = useState("transactions");
